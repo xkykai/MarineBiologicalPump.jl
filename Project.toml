@@ -1,0 +1,13 @@
+name = "MarineBiologicalPump"
+uuid = "4356e784-d339-43f5-bc67-a9bbabca20c8"
+authors = ["Xin Kai Lee <xin.lee18@imperial.ac.uk> and contributors"]
+version = "1.0.0-DEV"
+
+[compat]
+julia = "1"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
