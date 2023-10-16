@@ -65,7 +65,7 @@ const w_sinking = 1 / (24 * 60^2)
 
 sinking = AdvectiveForcing(w=w_sinking)
 
-Nages = 10
+const Nages = 50
 
 tracer_index = 0
 forcing_c = Symbol(:forcing_c, tracer_index)
@@ -145,7 +145,7 @@ b = model.tracers.b
 cs = [model.tracers[Symbol(:c, i)] for i in 0:Nages - 1]
 u, v, w = model.velocities
 
-simulation = Simulation(model, Δt=0.1second, stop_time=0.5days)
+simulation = Simulation(model, Δt=0.1second, stop_time=2days)
 
 wizard = TimeStepWizard(max_change=1.05, max_Δt=10minutes, cfl=0.6)
 simulation.callbacks[:wizard] = Callback(wizard, IterationInterval(10))
