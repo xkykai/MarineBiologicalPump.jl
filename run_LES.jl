@@ -5,7 +5,7 @@ using FileIO
 using Printf
 using CairoMakie
 using Oceananigans.Grids: halo_size
-using Oceananigans.Forcings: AdvectiveForcing, MultipleForcings
+using Oceananigans.Forcings: AdvectiveForcing
 using Oceananigans.Operators: ∂zᶜᶜᶠ, ℑzᵃᵃᶜ
 using Random
 using Statistics
@@ -65,7 +65,8 @@ const w_sinking = 1 / (24 * 60^2)
 
 sinking = AdvectiveForcing(w=w_sinking)
 
-const Nages = 10
+# const Nages = 10
+const Nages = 4
 
 tracer_index = 0
 forcing_c = Symbol(:forcing_c, tracer_index)
@@ -82,7 +83,7 @@ cᴿ² = Symbol(:c, tracer_index + 2)
             return -(-3c + 4cᴿ¹ - cᴿ²) / (2 * Δa) - c / (clock.time + 1e-8)
         end
     end
-    c_forcings = (; $c = MultipleForcings([Forcing($forcing_c, discrete_form=true), sinking]))
+    c_forcings = (; $c = (Forcing($forcing_c, discrete_form=true), sinking))
 end
 
 for tracer_index in 1:Nages - 2
@@ -100,7 +101,7 @@ for tracer_index in 1:Nages - 2
                 return -(cᴿ - cᴸ) / (2 * Δa) - c / (clock.time + 1e-8)
             end
         end
-        c_forcings = merge(c_forcings, (; $c = MultipleForcings([Forcing($forcing_c, discrete_form=true), sinking])))
+        c_forcings = merge(c_forcings, (; $c = (Forcing($forcing_c, discrete_form=true), sinking)))
     end
 end
 
@@ -119,7 +120,8 @@ cᴸ² = Symbol(:c, tracer_index - 2)
             return -(3c - 4cᴸ¹ + cᴸ²) / (2 * Δa) - c / (clock.time + 1e-8)
         end
     end
-    c_forcings = merge(c_forcings, (; $c = MultipleForcings([Forcing($forcing_c, discrete_form=true), sinking])))
+    # c_forcings = merge(c_forcings, (; $c = MultipleForcings([Forcing($forcing_c, discrete_form=true), sinking])))
+    c_forcings = merge(c_forcings, (; $c = (Forcing($forcing_c, discrete_form=true), sinking)))
 end
 
 tracers = [Symbol(:c, i) for i in 0:Nages - 1]
