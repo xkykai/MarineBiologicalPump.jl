@@ -13,18 +13,18 @@ using Statistics
 Random.seed!(123)
 
 const Lz = 64meter    # depth [m]
-const Lx = 128meter
-const Ly = 128meter
+const Lx = 64meter
+const Ly = 64meter
 
 const Nz = 32
-const Nx = 64
-const Ny = 64
+const Nx = 32
+const Ny = 32
 
 # const Nz = 32
 # const Nx = 64
 # const Ny = 64
 
-const Qᵁ = -1e-6
+const Qᵁ = 0
 const Qᴮ = 1e-6
 const Qᶜ = 2e-6
 
@@ -42,7 +42,7 @@ FILE_NAME = "QU_$(Qᵁ)_QB_$(Qᴮ)_test"
 FILE_DIR = "LES/$(FILE_NAME)"
 mkpath(FILE_DIR)
 
-grid = RectilinearGrid(CPU(), Float64,
+grid = RectilinearGrid(GPU(), Float64,
                        size = (Nx, Ny, Nz),
                        halo = (5, 5, 5),
                        x = (0, Lx),
@@ -60,12 +60,12 @@ b_bcs = FieldBoundaryConditions(top=FluxBoundaryCondition(Qᴮ), bottom=Gradient
 u_bcs = FieldBoundaryConditions(top=FluxBoundaryCondition(Qᵁ))
 c0_bcs = FieldBoundaryConditions(top=FluxBoundaryCondition(Qᶜ))
 
-const Δa = 10 * 60
+const Δa = 10 * 60 # 10 minutes age
 const w_sinking = 1 / (24 * 60^2)
 
 sinking = AdvectiveForcing(w=w_sinking)
 
-const Nages = 50
+const Nages = 10
 
 tracer_index = 0
 forcing_c = Symbol(:forcing_c, tracer_index)
@@ -79,7 +79,7 @@ cᴿ² = Symbol(:c, tracer_index + 2)
             cᴿ¹ = fields.$cᴿ¹[i, j, k]
             cᴿ² = fields.$cᴿ²[i, j, k]
 
-            return -(-3c + 4cᴿ¹ - cᴿ²) / (2 * Δa) - c / clock.time
+            return -(-3c + 4cᴿ¹ - cᴿ²) / (2 * Δa) - c / (clock.time + 1e-8)
         end
     end
     c_forcings = (; $c = MultipleForcings([Forcing($forcing_c, discrete_form=true), sinking]))
@@ -97,7 +97,7 @@ for tracer_index in 1:Nages - 2
                 cᴸ = fields.$cᴸ[i, j, k]
                 cᴿ = fields.$cᴿ[i, j, k]
 
-                return -(cᴿ - cᴸ) / (2 * Δa) - c / clock.time
+                return -(cᴿ - cᴸ) / (2 * Δa) - c / (clock.time + 1e-8)
             end
         end
         c_forcings = merge(c_forcings, (; $c = MultipleForcings([Forcing($forcing_c, discrete_form=true), sinking])))
@@ -116,7 +116,7 @@ cᴸ² = Symbol(:c, tracer_index - 2)
             cᴸ¹ = fields.$cᴸ¹[i, j, k]
             cᴸ² = fields.$cᴸ²[i, j, k]
 
-            return -(3c - 4cᴸ¹ + cᴸ²) / (2 * Δa) - c / clock.time
+            return -(3c - 4cᴸ¹ + cᴸ²) / (2 * Δa) - c / (clock.time + 1e-8)
         end
     end
     c_forcings = merge(c_forcings, (; $c = MultipleForcings([Forcing($forcing_c, discrete_form=true), sinking])))
@@ -184,18 +184,33 @@ end
 ubar = Average(u, dims=(1, 2))
 vbar = Average(v, dims=(1, 2))
 bbar = Average(b, dims=(1, 2))
-c_symbols = [Symbol(:c, i) for i in 0:Nages - 1]
+cbar_symbols = [Symbol(:c, i, :bar) for i in 0:Nages - 1]
 csbar = [Average(c, dims=(1, 2)) for c in cs]
 
 field_outputs = merge(model.velocities, model.tracers)
 timeseries_outputs = (; ubar, vbar, bbar)
-timeseries_outputs = merge(timeseries_outputs, (; zip(c_symbols, cs)...))
+timeseries_outputs = merge(timeseries_outputs, (; zip(cbar_symbols, csbar)...))
 
-simulation.output_writers[:jld2] = JLD2OutputWriter(model, field_outputs,
-                                                          filename = "$(FILE_DIR)/instantaneous_fields.jld2",
+simulation.output_writers[:xy_jld2] = JLD2OutputWriter(model, field_outputs,
+                                                          filename = "$(FILE_DIR)/instantaneous_fields_xy.jld2",
                                                           schedule = TimeInterval(10minutes),
                                                           with_halos = true,
-                                                          init = init_save_some_metadata!)
+                                                          init = init_save_some_metadata!,
+                                                          indices = (:, :, Nz))
+
+simulation.output_writers[:yz_jld2] = JLD2OutputWriter(model, field_outputs,
+                                                          filename = "$(FILE_DIR)/instantaneous_fields_yz.jld2",
+                                                          schedule = TimeInterval(10minutes),
+                                                          with_halos = true,
+                                                          init = init_save_some_metadata!,
+                                                          indices = (1, :, :))
+
+simulation.output_writers[:xz_jld2] = JLD2OutputWriter(model, field_outputs,
+                                                          filename = "$(FILE_DIR)/instantaneous_fields_xz.jld2",
+                                                          schedule = TimeInterval(10minutes),
+                                                          with_halos = true,
+                                                          init = init_save_some_metadata!,
+                                                          indices = (:, 1, :))
 
 simulation.output_writers[:timeseries] = JLD2OutputWriter(model, timeseries_outputs,
                                                           filename = "$(FILE_DIR)/instantaneous_timeseries.jld2",
