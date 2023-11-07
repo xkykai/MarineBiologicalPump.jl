@@ -9,6 +9,7 @@ using Oceananigans.Forcings: AdvectiveForcing
 using Oceananigans.Operators: ∂zᶜᶜᶠ, ℑzᵃᵃᶜ
 using Random
 using Statistics
+using Dates
 
 Random.seed!(123)
 
@@ -26,7 +27,7 @@ const Ny = 32
 
 const Qᵁ = 0
 const Qᴮ = 1e-6
-const Qᶜ = 2e-6
+const Qᶜ = -2e-6
 
 const Pr = 1
 const ν = 1e-5
@@ -34,11 +35,12 @@ const κ = ν / Pr
 
 const f = 1e-4
 
-const λᴮ = 0.4 / Lz
-
+const dbdz = 1e-4
 const b_surface = 0
 
-FILE_NAME = "QU_$(Qᵁ)_QB_$(Qᴮ)_test"
+const Nages = 20
+
+FILE_NAME = "QU_$(Qᵁ)_QB_$(Qᴮ)_dbdz_$(dbdz)_Nages_$(Nages)_test"
 FILE_DIR = "LES/$(FILE_NAME)"
 mkpath(FILE_DIR)
 
@@ -52,11 +54,9 @@ grid = RectilinearGrid(GPU(), Float64,
 
 noise(x, y, z) = rand() * exp(z / 8)
 
-b_initial(x, y, z) = b_surface * (1 + λᴮ*z) + 1e-6 * noise(x, y, z)
+b_initial(x, y, z) = dbdz * z + b_surface + 1e-6 * noise(x, y, z)
 
-dbdz_bot = λᴮ
-
-b_bcs = FieldBoundaryConditions(top=FluxBoundaryCondition(Qᴮ), bottom=GradientBoundaryCondition(dbdz_bot))
+b_bcs = FieldBoundaryConditions(top=FluxBoundaryCondition(Qᴮ), bottom=GradientBoundaryCondition(dbdz))
 u_bcs = FieldBoundaryConditions(top=FluxBoundaryCondition(Qᵁ))
 c0_bcs = FieldBoundaryConditions(top=FluxBoundaryCondition(Qᶜ))
 
@@ -65,7 +65,6 @@ const w_sinking = 1 / (24 * 60^2)
 
 sinking = AdvectiveForcing(w=w_sinking)
 
-const Nages = 10
 # const Nages = 4
 
 tracer_index = 0
@@ -147,7 +146,7 @@ b = model.tracers.b
 cs = [model.tracers[Symbol(:c, i)] for i in 0:Nages - 1]
 u, v, w = model.velocities
 
-simulation = Simulation(model, Δt=0.1second, stop_time=0.25days)
+simulation = Simulation(model, Δt=0.1second, stop_time=0.5days)
 
 wizard = TimeStepWizard(max_change=1.05, max_Δt=10minutes, cfl=0.6)
 simulation.callbacks[:wizard] = Callback(wizard, IterationInterval(10))
@@ -155,7 +154,8 @@ simulation.callbacks[:wizard] = Callback(wizard, IterationInterval(10))
 wall_clock = [time_ns()]
 
 function print_progress(sim)
-    @printf("[%05.2f%%] i: %d, t: %s, wall time: %s, max(u): (%6.3e, %6.3e, %6.3e) m/s, max(b) %6.3e, next Δt: %s\n",
+    @printf("%s [%05.2f%%] i: %d, t: %s, wall time: %s, max(u): (%6.3e, %6.3e, %6.3e) m/s, max(b) %6.3e, max(c0) %6.3e, next Δt: %s\n",
+            Dates.now(),
             100 * (sim.model.clock.time / sim.stop_time),
             sim.model.clock.iteration,
             prettytime(sim.model.clock.time),
@@ -164,6 +164,7 @@ function print_progress(sim)
             maximum(abs, sim.model.velocities.v),
             maximum(abs, sim.model.velocities.w),
             maximum(abs, sim.model.tracers.b),
+            maximum(abs, sim.model.tracers.c0),
             prettytime(sim.Δt))
 
     wall_clock[1] = time_ns()
