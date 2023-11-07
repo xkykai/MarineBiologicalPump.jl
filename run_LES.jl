@@ -225,3 +225,77 @@ simulation.output_writers[:checkpointer] = Checkpointer(model, schedule=TimeInte
 
 # run!(simulation, pickup="$(FILE_DIR)/model_checkpoint_iteration97574.jld2")
 run!(simulation)
+
+#%%
+ubar_data = FieldTimeSeries("$(FILE_DIR)/instantaneous_timeseries.jld2", "ubar", backend=OnDisk())
+vbar_data = FieldTimeSeries("$(FILE_DIR)/instantaneous_timeseries.jld2", "vbar", backend=OnDisk())
+bbar_data = FieldTimeSeries("$(FILE_DIR)/instantaneous_timeseries.jld2", "bbar", backend=OnDisk())
+
+csbar_data = [FieldTimeSeries("$(FILE_DIR)/instantaneous_timeseries.jld2", "c$(i)bar", backend=OnDisk()) for i in 0:Nages-1]
+
+Nt = length(bbar_data.times)
+
+xC = bbar_data.grid.xᶜᵃᵃ[1:Nx]
+yC = bbar_data.grid.xᶜᵃᵃ[1:Ny]
+zC = bbar_data.grid.zᵃᵃᶜ[1:Nz]
+
+##
+fig = Figure(resolution=(1800, 1500))
+
+axubar = Axis(fig[1, 1], title="<u>", xlabel="<u>", ylabel="z")
+axvbar = Axis(fig[1, 2], title="<v>", xlabel="<v>", ylabel="z")
+axbbar = Axis(fig[1, 3], title="<b>", xlabel="<b>", ylabel="z")
+axcbar = Axis(fig[2, 1], title="<c>", xlabel="<c>", ylabel="z")
+
+function find_min(a...)
+  return minimum(minimum.([a...]))
+end
+
+function find_max(a...)
+  return maximum(maximum.([a...]))
+end
+
+ubarlim = (minimum(ubar_data), maximum(ubar_data))
+vbarlim = (minimum(vbar_data), maximum(vbar_data))
+bbarlim = (minimum(bbar_data), maximum(bbar_data))
+cbarlim = (find_min(csbar_data...), find_max(csbar_data...))
+
+n = Observable(1)
+
+parameters = jldopen("$(FILE_DIR)/instantaneous_timeseries.jld2", "r") do file
+    return Dict([(key, file["metadata/parameters/$(key)"]) for key in keys(file["metadata/parameters"])])
+end 
+
+time_str = @lift "Qᵁ = $(Qᵁ), Qᴮ = $(Qᴮ), Time = $(round(bbar_data.times[$n]/24/60^2, digits=3)) days"
+title = Label(fig[0, :], time_str, font=:bold, tellwidth=false)
+
+ubarₙ = @lift interior(ubar_data[$n], 1, 1, :)
+vbarₙ = @lift interior(vbar_data[$n], 1, 1, :)
+bbarₙ = @lift interior(bbar_data[$n], 1, 1, :)
+
+csbarₙ = [@lift interior(data[$n], 1, 1, :) for data in csbar_data]
+
+lines!(axubar, ubarₙ, zC)
+lines!(axvbar, vbarₙ, zC)
+lines!(axbbar, bbarₙ, zC)
+
+for (i, data) in enumerate(csbarₙ)
+    lines!(axcbar, data, zC, label="c$(i-1)")
+end
+
+Legend(fig[2, 2], axcbar, tellwidth=false)
+
+xlims!(axubar, ubarlim)
+xlims!(axvbar, vbarlim)
+xlims!(axbbar, bbarlim)
+xlims!(axcbar, cbarlim)
+
+trim!(fig.layout)
+
+record(fig, "$(FILE_DIR)/$(FILE_NAME).mp4", 1:Nt, framerate=15) do nn
+    n[] = nn
+end
+
+@info "Animation completed"
+
+#%%
