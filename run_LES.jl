@@ -13,11 +13,11 @@ using Dates
 
 Random.seed!(123)
 
-const Lz = 64meter    # depth [m]
+const Lz = 128meter    # depth [m]
 const Lx = 64meter
 const Ly = 64meter
 
-const Nz = 32
+const Nz = 64
 const Nx = 32
 const Ny = 32
 
@@ -35,12 +35,12 @@ const κ = ν / Pr
 
 const f = 1e-4
 
-const dbdz = 1e-4
+const dbdz = 2e-4
 const b_surface = 0
 
 const Nages = 20
 
-FILE_NAME = "QU_$(Qᵁ)_QB_$(Qᴮ)_dbdz_$(dbdz)_Nages_$(Nages)_test"
+FILE_NAME = "QU_$(Qᵁ)_QB_$(Qᴮ)_dbdz_$(dbdz)_Nages_$(Nages)_Lxz_$(Lx)_$(Lz)_test"
 FILE_DIR = "LES/$(FILE_NAME)"
 mkpath(FILE_DIR)
 
@@ -54,14 +54,25 @@ grid = RectilinearGrid(GPU(), Float64,
 
 noise(x, y, z) = rand() * exp(z / 8)
 
-b_initial(x, y, z) = dbdz * z + b_surface + 1e-6 * noise(x, y, z)
+b_initial(x, y, z) = dbdz * z + b_surface
+b_initial_noisy(x, y, z) = b_initial(x, y, z) + 1e-6 * noise(x, y, z)
 
 b_bcs = FieldBoundaryConditions(top=FluxBoundaryCondition(Qᴮ), bottom=GradientBoundaryCondition(dbdz))
 u_bcs = FieldBoundaryConditions(top=FluxBoundaryCondition(Qᵁ))
 c0_bcs = FieldBoundaryConditions(top=FluxBoundaryCondition(Qᶜ))
 
+damping_rate = 1/5minutes
+
+b_target(x, y, z, t) = b_initial(x, y, z)
+
+bottom_mask = GaussianMask{:z}(center=-grid.Lz, width=grid.Lz/10)
+
+uvw_sponge = Relaxation(rate=damping_rate, mask=bottom_mask)
+b_sponge = Relaxation(rate=damping_rate, mask=bottom_mask, target=b_target)
+c_sponge = Relaxation(rate=damping_rate, mask=bottom_mask)
+
 const Δa = 10 * 60 # 10 minutes age
-const w_sinking = 1 / (24 * 60^2)
+const w_sinking = -50 / (12 * 60^2)
 
 sinking = AdvectiveForcing(w=w_sinking)
 
@@ -82,7 +93,7 @@ cᴿ² = Symbol(:c, tracer_index + 2)
             return -(-3c + 4cᴿ¹ - cᴿ²) / (2 * Δa) - c / (clock.time + 1e-8)
         end
     end
-    c_forcings = (; $c = (Forcing($forcing_c, discrete_form=true), sinking))
+    c_forcings = (; $c = (Forcing($forcing_c, discrete_form=true), sinking, c_sponge))
 end
 
 for tracer_index in 1:Nages - 2
@@ -100,7 +111,7 @@ for tracer_index in 1:Nages - 2
                 return -(cᴿ - cᴸ) / (2 * Δa) - c / (clock.time + 1e-8)
             end
         end
-        c_forcings = merge(c_forcings, (; $c = (Forcing($forcing_c, discrete_form=true), sinking)))
+        c_forcings = merge(c_forcings, (; $c = (Forcing($forcing_c, discrete_form=true), sinking, c_sponge)))
     end
 end
 
@@ -119,13 +130,14 @@ cᴸ² = Symbol(:c, tracer_index - 2)
             return -(3c - 4cᴸ¹ + cᴸ²) / (2 * Δa) - c / (clock.time + 1e-8)
         end
     end
-    # c_forcings = merge(c_forcings, (; $c = MultipleForcings([Forcing($forcing_c, discrete_form=true), sinking])))
-    c_forcings = merge(c_forcings, (; $c = (Forcing($forcing_c, discrete_form=true), sinking)))
+    c_forcings = merge(c_forcings, (; $c = (Forcing($forcing_c, discrete_form=true), sinking, c_sponge)))
 end
 
 tracers = [Symbol(:c, i) for i in 0:Nages - 1]
 tracers = push!(tracers, :b)
 tracers = Tuple(tracers)
+
+forcings = merge(c_forcings, (; b = b_sponge, u = uvw_sponge, v = uvw_sponge, w = uvw_sponge))
 
 model = NonhydrostaticModel(; 
             grid = grid,
@@ -136,17 +148,16 @@ model = NonhydrostaticModel(;
             timestepper = :RungeKutta3,
             advection = WENO(order=9),
             boundary_conditions = (b=b_bcs, u=u_bcs, c0=c0_bcs),
-            forcing = c_forcings
+            forcing = forcings
             )
 
-set!(model, b=b_initial)
-# set!(model, T=20, S=32)
+set!(model, b=b_initial_noisy)
 
 b = model.tracers.b
 cs = [model.tracers[Symbol(:c, i)] for i in 0:Nages - 1]
 u, v, w = model.velocities
 
-simulation = Simulation(model, Δt=0.1second, stop_time=0.5days)
+simulation = Simulation(model, Δt=0.1seconds, stop_time=2days)
 
 wizard = TimeStepWizard(max_change=1.05, max_Δt=10minutes, cfl=0.6)
 simulation.callbacks[:wizard] = Callback(wizard, IterationInterval(10))
@@ -180,7 +191,8 @@ function init_save_some_metadata!(file, model)
     file["metadata/parameters/momentum_flux"] = Qᵁ
     file["metadata/parameters/buoyancy_flux"] = Qᴮ
     file["metadata/parameters/carbon_flux"] = Qᶜ
-    file["metadata/parameters/buoyancy_gradient"] = λᴮ
+    file["metadata/parameters/dbdz"] = dbdz
+    file["metadata/parameters/b_surface"] = b_surface
     return nothing
 end
 
@@ -221,7 +233,7 @@ simulation.output_writers[:timeseries] = JLD2OutputWriter(model, timeseries_outp
                                                           with_halos = true,
                                                           init = init_save_some_metadata!)
 
-simulation.output_writers[:checkpointer] = Checkpointer(model, schedule=TimeInterval(1day), prefix="$(FILE_DIR)/model_checkpoint")
+simulation.output_writers[:checkpointer] = Checkpointer(model, schedule=TimeInterval(1days), prefix="$(FILE_DIR)/model_checkpoint")
 
 # run!(simulation, pickup="$(FILE_DIR)/model_checkpoint_iteration97574.jld2")
 run!(simulation)
