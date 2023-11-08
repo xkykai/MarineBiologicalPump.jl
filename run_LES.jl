@@ -40,6 +40,8 @@ const b_surface = 0
 
 const Nages = 20
 
+const pickup = true
+
 FILE_NAME = "QU_$(Qᵁ)_QB_$(Qᴮ)_dbdz_$(dbdz)_Nages_$(Nages)_Lxz_$(Lx)_$(Lz)_test"
 FILE_DIR = "LES/$(FILE_NAME)"
 mkpath(FILE_DIR)
@@ -157,7 +159,7 @@ b = model.tracers.b
 cs = [model.tracers[Symbol(:c, i)] for i in 0:Nages - 1]
 u, v, w = model.velocities
 
-simulation = Simulation(model, Δt=0.1seconds, stop_time=2days)
+simulation = Simulation(model, Δt=0.1seconds, stop_time=8days)
 
 wizard = TimeStepWizard(max_change=1.05, max_Δt=10minutes, cfl=0.6)
 simulation.callbacks[:wizard] = Callback(wizard, IterationInterval(10))
@@ -235,8 +237,19 @@ simulation.output_writers[:timeseries] = JLD2OutputWriter(model, timeseries_outp
 
 simulation.output_writers[:checkpointer] = Checkpointer(model, schedule=TimeInterval(1days), prefix="$(FILE_DIR)/model_checkpoint")
 
-# run!(simulation, pickup="$(FILE_DIR)/model_checkpoint_iteration97574.jld2")
-run!(simulation)
+if pickup
+    files = readdir(FILE_DIR)
+    checkpoint_files = files[occursin.("model_checkpoint_iteration", files)]
+    if !isempty(checkpoint_files)
+        checkpoint_iters = parse.(Int, [filename[findfirst("iteration", filename)[end]+1:findfirst(".jld2", filename)[1]-1] for filename in checkpoint_files])
+        pickup_iter = maximum(checkpoint_iters)
+        run!(simulation, pickup="$(FILE_DIR)/model_checkpoint_iteration$(pickup_iter).jld2")
+    else
+        run!(simulation)
+    end
+else
+    run!(simulation)
+end
 
 #%%
 ubar_data = FieldTimeSeries("$(FILE_DIR)/instantaneous_timeseries.jld2", "ubar", backend=OnDisk())
