@@ -41,8 +41,12 @@ const b_surface = 0
 const Nages = 20
 
 const pickup = true
+const c0_flux_stop = 2 # day where carbon flux decreases to middle of tanh function
 
-FILE_NAME = "QU_$(Qᵁ)_QB_$(Qᴮ)_dbdz_$(dbdz)_Nages_$(Nages)_Lxz_$(Lx)_$(Lz)_test"
+const Δa = 10 * 60 # 10 minutes age
+const w_sinking = -Lz / (4 * 24 * 60^2)
+
+FILE_NAME = "QU_$(Qᵁ)_QB_$(Qᴮ)_dbdz_$(dbdz)_Nages_$(Nages)_Lxz_$(Lx)_$(Lz)_halfc0_$(c0_flux_stop)_w_$(w_sinking)_test"
 FILE_DIR = "LES/$(FILE_NAME)"
 mkpath(FILE_DIR)
 
@@ -59,9 +63,14 @@ noise(x, y, z) = rand() * exp(z / 8)
 b_initial(x, y, z) = dbdz * z + b_surface
 b_initial_noisy(x, y, z) = b_initial(x, y, z) + 1e-6 * noise(x, y, z)
 
+
+@inline c0_flux(x, y, t) = Qᶜ * (-tanh(t - c0_flux_stop) + 1)
+
+c0_top_bc = FluxBoundaryCondition(c0_flux)
+
 b_bcs = FieldBoundaryConditions(top=FluxBoundaryCondition(Qᴮ), bottom=GradientBoundaryCondition(dbdz))
 u_bcs = FieldBoundaryConditions(top=FluxBoundaryCondition(Qᵁ))
-c0_bcs = FieldBoundaryConditions(top=FluxBoundaryCondition(Qᶜ))
+c0_bcs = FieldBoundaryConditions(top=FluxBoundaryCondition(c0_flux))
 
 damping_rate = 1/5minutes
 
@@ -72,9 +81,6 @@ bottom_mask = GaussianMask{:z}(center=-grid.Lz, width=grid.Lz/10)
 uvw_sponge = Relaxation(rate=damping_rate, mask=bottom_mask)
 b_sponge = Relaxation(rate=damping_rate, mask=bottom_mask, target=b_target)
 c_sponge = Relaxation(rate=damping_rate, mask=bottom_mask)
-
-const Δa = 10 * 60 # 10 minutes age
-const w_sinking = -50 / (12 * 60^2)
 
 sinking = AdvectiveForcing(w=w_sinking)
 
@@ -195,6 +201,7 @@ function init_save_some_metadata!(file, model)
     file["metadata/parameters/carbon_flux"] = Qᶜ
     file["metadata/parameters/dbdz"] = dbdz
     file["metadata/parameters/b_surface"] = b_surface
+    file["metadata/parameters/half_c0_flux_time"] = c0_flux_stop
     return nothing
 end
 
