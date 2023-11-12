@@ -39,11 +39,14 @@ const dbdz = 2e-4
 const b_surface = 0
 
 const Nages = 20
+# const Nages = 4
 
 const pickup = true
 const c0_flux_stop = 2 # day where carbon flux decreases to middle of tanh function
 
 const Δa = 10 * 60 # 10 minutes age
+
+const ages = [i * Δa for i in 0:Nages-1]
 const w_sinking = -Lz / (4 * 24 * 60^2)
 
 FILE_NAME = "QU_$(Qᵁ)_QB_$(Qᴮ)_dbdz_$(dbdz)_Nages_$(Nages)_Lxz_$(Lx)_$(Lz)_halfc0_$(c0_flux_stop)_w_$(w_sinking)_test"
@@ -63,8 +66,7 @@ noise(x, y, z) = rand() * exp(z / 8)
 b_initial(x, y, z) = dbdz * z + b_surface
 b_initial_noisy(x, y, z) = b_initial(x, y, z) + 1e-6 * noise(x, y, z)
 
-
-@inline c0_flux(x, y, t) = Qᶜ * (-tanh(t - c0_flux_stop) + 1)
+@inline c0_flux(x, y, t) = Qᶜ / 2 * (-tanh(t - c0_flux_stop) + 1)
 
 c0_top_bc = FluxBoundaryCondition(c0_flux)
 
@@ -85,12 +87,13 @@ c_sponge = Relaxation(rate=damping_rate, mask=bottom_mask)
 sinking = AdvectiveForcing(w=w_sinking)
 
 # const Nages = 4
-
+#%%
 tracer_index = 0
 forcing_c = Symbol(:forcing_c, tracer_index)
 c  = Symbol(:c, tracer_index)
 cᴿ¹ = Symbol(:c, tracer_index + 1)
 cᴿ² = Symbol(:c, tracer_index + 2)
+age = ages[tracer_index + 1]
 @eval begin
     @inline function $forcing_c(i, j, k, grid, clock, fields)
         @inbounds begin
@@ -98,7 +101,7 @@ cᴿ² = Symbol(:c, tracer_index + 2)
             cᴿ¹ = fields.$cᴿ¹[i, j, k]
             cᴿ² = fields.$cᴿ²[i, j, k]
 
-            return -(-3c + 4cᴿ¹ - cᴿ²) / (2 * Δa) - c / (clock.time + 1e-8)
+            return -(-3c + 4cᴿ¹ - cᴿ²) / (2 * Δa) - c / ($age + 1e-8)
         end
     end
     c_forcings = (; $c = (Forcing($forcing_c, discrete_form=true), sinking, c_sponge))
@@ -109,6 +112,7 @@ for tracer_index in 1:Nages - 2
     c  = Symbol(:c, tracer_index)
     cᴸ = Symbol(:c, tracer_index - 1)
     cᴿ = Symbol(:c, tracer_index + 1)
+    age = ages[tracer_index + 1]
     @eval begin
         @inline function $forcing_c(i, j, k, grid, clock, fields)
             @inbounds begin
@@ -116,7 +120,7 @@ for tracer_index in 1:Nages - 2
                 cᴸ = fields.$cᴸ[i, j, k]
                 cᴿ = fields.$cᴿ[i, j, k]
 
-                return -(cᴿ - cᴸ) / (2 * Δa) - c / (clock.time + 1e-8)
+                return -(cᴿ - cᴸ) / (2 * Δa) - c / ($age + 1e-8)
             end
         end
         c_forcings = merge(c_forcings, (; $c = (Forcing($forcing_c, discrete_form=true), sinking, c_sponge)))
@@ -128,6 +132,7 @@ forcing_c = Symbol(:forcing_c, tracer_index)
 c  = Symbol(:c, tracer_index)
 cᴸ¹ = Symbol(:c, tracer_index - 1)
 cᴸ² = Symbol(:c, tracer_index - 2)
+age = ages[tracer_index + 1]
 @eval begin
     @inline function $forcing_c(i, j, k, grid, clock, fields)
         @inbounds begin
@@ -135,7 +140,7 @@ cᴸ² = Symbol(:c, tracer_index - 2)
             cᴸ¹ = fields.$cᴸ¹[i, j, k]
             cᴸ² = fields.$cᴸ²[i, j, k]
 
-            return -(3c - 4cᴸ¹ + cᴸ²) / (2 * Δa) - c / (clock.time + 1e-8)
+            return -(3c - 4cᴸ¹ + cᴸ²) / (2 * Δa) - c / ($age + 1e-8)
         end
     end
     c_forcings = merge(c_forcings, (; $c = (Forcing($forcing_c, discrete_form=true), sinking, c_sponge)))
@@ -146,7 +151,7 @@ tracers = push!(tracers, :b)
 tracers = Tuple(tracers)
 
 forcings = merge(c_forcings, (; b = b_sponge, u = uvw_sponge, v = uvw_sponge, w = uvw_sponge))
-
+#%%
 model = NonhydrostaticModel(; 
             grid = grid,
             closure = ScalarDiffusivity(ν=ν, κ=κ),
