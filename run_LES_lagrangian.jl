@@ -97,7 +97,7 @@ particles = StructArray{LagrangianPOC}((x_particle, y_particle, z_particle))
     return w_sinking
 end
 
-particle_forcing_w  = ParticleDiscreteForcing(w_sinking)
+particle_forcing_w  = ParticleDiscreteForcing(sinking_dynamics)
 particle_velocities = ParticleVelocities(w=particle_forcing_w)
 
 lagrangian_particles = LagrangianParticles(particles, advective_velocity=particle_velocities)
@@ -129,7 +129,7 @@ simulation.callbacks[:wizard] = Callback(wizard, IterationInterval(10))
 wall_clock = [time_ns()]
 
 function print_progress(sim)
-    @printf("%s [%05.2f%%] i: %d, t: %s, wall time: %s, max(u): (%6.3e, %6.3e, %6.3e) m/s, max(b) %6.3e, next Δt: %s\n",
+    @printf("%s [%05.2f%%] i: %d, t: %s, wall time: %s, max(u): (%6.3e, %6.3e, %6.3e) m/s, max(b) %6.3e, <z> %6.3e next Δt: %s\n",
             Dates.now(),
             100 * (sim.model.clock.time / sim.stop_time),
             sim.model.clock.iteration,
@@ -139,6 +139,7 @@ function print_progress(sim)
             maximum(abs, sim.model.velocities.v),
             maximum(abs, sim.model.velocities.w),
             maximum(abs, sim.model.tracers.b),
+            mean(lagrangian_particles.properties.z),
             prettytime(sim.Δt))
 
     wall_clock[1] = time_ns()
