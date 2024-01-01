@@ -24,6 +24,7 @@ const Nz = 128
 const Nx = 128
 const Ny = 128
 
+# const Qᵁ = -1e-4
 const Qᵁ = 0
 const Qᴮ = 1e-6
 
@@ -38,7 +39,8 @@ const b_surface = 0
 
 const pickup = true
 
-const w_sinking = -Lz / (2 * 24 * 60^2)
+# const w_sinking = -Lz / (2 * 24 * 60^2)
+const w_sinking = 0
 
 function find_min(a...)
     return minimum(minimum.([a...]))
@@ -85,7 +87,7 @@ struct LagrangianPOC{T}
     z :: T
 end
 
-n_particles = 100
+n_particles = 1000
 
 x_particle = CuArray(rand(n_particles) * Lx)
 y_particle = CuArray(rand(n_particles) * Ly)
@@ -94,7 +96,7 @@ z_particle = CuArray(-0.1 * rand(n_particles) * Lz)
 particles = StructArray{LagrangianPOC}((x_particle, y_particle, z_particle))
 
 @inline function sinking_dynamics(x, y, z, w_fluid, particles, p, grid, clock, Δt, model_fields)
-    return w_sinking
+    return w_sinking + w_fluid
 end
 
 particle_forcing_w  = ParticleDiscreteForcing(sinking_dynamics)
@@ -167,6 +169,7 @@ field_outputs = merge(model.velocities, model.tracers)
 timeseries_outputs = (; ubar, vbar, bbar)
 particle_outputs = (; model.particles)
 
+#=
 simulation.output_writers[:xy_jld2] = JLD2OutputWriter(model, field_outputs,
                                                           filename = "$(FILE_DIR)/instantaneous_fields_xy.jld2",
                                                           schedule = TimeInterval(10minutes),
@@ -220,27 +223,23 @@ if pickup
 else
     run!(simulation)
 end
-
+=#
 #%%
-file = jldopen("$(FILE_DIR)/particles.jld2", "r")
-close(file)
-#%%
-# FILE_DIR = "./LES/QU_0_QB_1.0e-6_QC_-1000.0_dbdz_0.0002_Nages_20_Lxz_64.0_128.0_halfc0_2_w_-0.002962962962962963_test7"
 
 b_xy_data = FieldTimeSeries("$(FILE_DIR)/instantaneous_fields_xy.jld2", "b", backend=OnDisk())
 b_xz_data = FieldTimeSeries("$(FILE_DIR)/instantaneous_fields_xz.jld2", "b", backend=OnDisk())
 b_yz_data = FieldTimeSeries("$(FILE_DIR)/instantaneous_fields_yz.jld2", "b", backend=OnDisk())
 
 bbar_data = FieldTimeSeries("$(FILE_DIR)/instantaneous_timeseries.jld2", "bbar")
-# particle_data = FieldDataset("$(FILE_DIR)/particles.jld2")
 
+particle_data = jldopen("$(FILE_DIR)/particles.jld2", "r") do file
+    iters = keys(file["timeseries/t"])
+    particle_timeseries = [file["timeseries/particles/$(iter)"] for iter in iters]
+    return particle_timeseries
+end
 
 blim = (find_min(b_xy_data, b_yz_data, b_xz_data), find_max(b_xy_data, b_yz_data, b_xz_data))
 bbarlim = (minimum(bbar_data), maximum(bbar_data))
-# cbarlim = (find_min(csbar_data...), find_max(csbar_data...))
-cbarlim = (find_min(csbar_data...), 100)
-
-# c_xticks = [0, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096]
 
 Nt = length(bbar_data.times)
 
@@ -254,7 +253,7 @@ fig = Figure(resolution=(2000, 2000))
 axb = Axis3(fig[1:2, 1:2], title="b", xlabel="x", ylabel="y", zlabel="z", viewmode=:fitzoom, aspect=:data)
 
 axbbar = Axis(fig[3, 1], title="<b>", xlabel="<b>", ylabel="z")
-axcbar = Axis(fig[3, 2], title="<c>", xlabel="<c>", ylabel="z")
+axparticle = Axis(fig[3, 2], title="Particle location", xlabel="x", ylabel="z")
 
 xs_xy = xC
 ys_xy = yC
@@ -291,34 +290,25 @@ bₙ_yz = @lift transpose(interior(b_yz_data[$n], 1, :, :))
 bₙ_xz = @lift interior(b_xz_data[$n], :, 1, :)
 
 bbarₙ = @lift interior(bbar_data[$n], 1, 1, :)
-csbarₙ = [@lift interior(data[$n], 1, 1, :) for data in csbar_data]
-
-# cmin = @lift find_min([interior(data[$n], 1, 1, :) for data in csbar_data]..., -1e-5)
-# cmax = @lift find_max([interior(data[$n], 1, 1, :) for data in csbar_data]..., 1e-5)
-
-# cbarlim = @lift (find_min([interior(data[$n], 1, 1, :) for data in csbar_data]..., -1e-5), find_max([interior(data[$n], 1, 1, :) for data in csbar_data]..., 1e-5))
+xs_particleₙ = @lift particle_data[$n].x
+zs_particleₙ = @lift particle_data[$n].z
 
 b_xy_surface = surface!(axb, xs_xy, ys_xy, zs_xy, color=bₙ_xy, colormap=colormap, colorrange = b_color_range)
 b_yz_surface = surface!(axb, xs_yz, ys_yz, zs_yz, color=bₙ_yz, colormap=colormap, colorrange = b_color_range)
 b_xz_surface = surface!(axb, xs_xz, ys_xz, zs_xz, color=bₙ_xz, colormap=colormap, colorrange = b_color_range)
 
 lines!(axbbar, bbarₙ, zC)
-
-for (i, data) in enumerate(csbarₙ)
-    lines!(axcbar, data, zC, label="c$(i-1)")
-end
-
-Legend(fig[4, :], axcbar, tellwidth=false, orientation=:horizontal, nbanks=2)
+scatter!(axparticle, xs_particleₙ, zs_particleₙ)
 
 xlims!(axbbar, bbarlim)
-xlims!(axcbar, cbarlim)
-# xlims!(axcbar, (cmin[], cmax[]))
-# xlims!(axcbar, (-0.1, 0.1))
+xlims!(axparticle, (0, Lx))
+
+ylims!(axparticle, (-Lz, 0))
 
 trim!(fig.layout)
 display(fig)
 
-record(fig, "$(FILE_DIR)/video.mp4", 1:Nt, framerate=15) do nn
+record(fig, "./Data/$(FILE_NAME).mp4", 1:Nt, framerate=15) do nn
     n[] = nn
 end
 
