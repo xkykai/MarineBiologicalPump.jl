@@ -24,8 +24,8 @@ const Nz = 128
 const Nx = 128
 const Ny = 128
 
-# const Qᵁ = -1e-4
-const Qᵁ = 0
+const Qᵁ = -1e-4
+# const Qᵁ = 0
 const Qᴮ = 1e-6
 
 const Pr = 1
@@ -39,8 +39,8 @@ const b_surface = 0
 
 const pickup = true
 
-# const w_sinking = -Lz / (2 * 24 * 60^2)
-const w_sinking = 0
+const w_sinking = -Lz / (3 * 24 * 60^2)
+# const w_sinking = 0
 
 function find_min(a...)
     return minimum(minimum.([a...]))
@@ -50,7 +50,9 @@ function find_max(a...)
     return maximum(maximum.([a...]))
 end
 
-FILE_NAME = "Lagrangian_QU_$(Qᵁ)_QB_$(Qᴮ)_dbdz_$(dbdz)_Lxz_$(Lx)_$(Lz)_w_$(w_sinking)"
+const n_particles = 5000
+
+FILE_NAME = "Lagrangian_n_particles_$(n_particles)_QU_$(Qᵁ)_QB_$(Qᴮ)_dbdz_$(dbdz)_Lxz_$(Lx)_$(Lz)_w_$(w_sinking)"
 FILE_DIR = "LES/$(FILE_NAME)"
 mkpath(FILE_DIR)
 
@@ -86,8 +88,6 @@ struct LagrangianPOC{T}
     y :: T
     z :: T
 end
-
-n_particles = 2000
 
 x_particle = CuArray(rand(n_particles) * Lx)
 y_particle = CuArray(rand(n_particles) * Ly)
