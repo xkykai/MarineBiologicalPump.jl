@@ -87,7 +87,7 @@ struct LagrangianPOC{T}
     z :: T
 end
 
-n_particles = 1000
+n_particles = 2000
 
 x_particle = CuArray(rand(n_particles) * Lx)
 y_particle = CuArray(rand(n_particles) * Ly)
@@ -169,7 +169,6 @@ field_outputs = merge(model.velocities, model.tracers)
 timeseries_outputs = (; ubar, vbar, bbar)
 particle_outputs = (; model.particles)
 
-#=
 simulation.output_writers[:xy_jld2] = JLD2OutputWriter(model, field_outputs,
                                                           filename = "$(FILE_DIR)/instantaneous_fields_xy.jld2",
                                                           schedule = TimeInterval(10minutes),
@@ -223,9 +222,8 @@ if pickup
 else
     run!(simulation)
 end
-=#
-#%%
 
+#%%
 b_xy_data = FieldTimeSeries("$(FILE_DIR)/instantaneous_fields_xy.jld2", "b", backend=OnDisk())
 b_xz_data = FieldTimeSeries("$(FILE_DIR)/instantaneous_fields_xz.jld2", "b", backend=OnDisk())
 b_yz_data = FieldTimeSeries("$(FILE_DIR)/instantaneous_fields_yz.jld2", "b", backend=OnDisk())
