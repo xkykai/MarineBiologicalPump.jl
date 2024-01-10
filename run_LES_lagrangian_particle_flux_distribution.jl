@@ -14,7 +14,7 @@ using CUDA: CuArray
 using KernelAbstractions
 using Oceananigans.Architectures: device, architecture
 using ArgParse
-
+using Distributions
 
 function parse_commandline()
     s = ArgParseSettings()
@@ -47,23 +47,23 @@ function parse_commandline()
       "--Nx"
         help = "Number of grid points in x-direction"
         arg_type = Int64
-        default = 256
+        default = 128
       "--Ny"
         help = "Number of grid points in y-direction"
         arg_type = Int64
-        default = 256
+        default = 128
       "--Lz"
         help = "Domain depth"
         arg_type = Float64
-        default = 256.
+        default = 128.
       "--Lx"
         help = "Domain width in x-direction"
         arg_type = Float64
-        default = 512.
+        default = 128.
       "--Ly"
         help = "Domain width in y-direction"
         arg_type = Float64
-        default = 512.
+        default = 128.
       "--dt"
         help = "Initial timestep to take (seconds)"
         arg_type = Float64
@@ -104,6 +104,10 @@ function parse_commandline()
         help = "Location to save files"
         arg_type = String
         default = "."
+      "--n_particles"
+        help = "Number of particles to release at regular intervals"
+        arg_type = Int64
+        default = 2000
     end
     return parse_args(s)
 end
@@ -159,9 +163,6 @@ const b_surface = args["b_surface"]
 
 const pickup = args["pickup"]
 
-const w_sinking = args["w_sinking"]
-# const w_sinking = 0
-
 const stop_time = args["stop_time"]days
 
 function find_min(a...)
@@ -172,7 +173,7 @@ function find_max(a...)
     return maximum(maximum.([a...]))
 end
 
-FILE_NAME = "Lagrangian_n_particles_$(n_particles)_QU_$(Qᵁ)_QB_$(Qᴮ)_dbdz_$(dbdz)_Lxz_$(Lx)_$(Lz)_Nxz_$(Nx)_$(Nz)_w_$(w_sinking)_$(advection)"
+FILE_NAME = "Lagrangian_Pareto_n_particles_$(n_particles)_QU_$(Qᵁ)_QB_$(Qᴮ)_dbdz_$(dbdz)_Lxz_$(Lx)_$(Lz)_Nxz_$(Nx)_$(Nz)_$(advection)"
 FILE_DIR = "LES/$(FILE_NAME)"
 mkpath(FILE_DIR)
 
@@ -203,12 +204,14 @@ b_sponge = Relaxation(rate=damping_rate, mask=bottom_mask, target=b_target)
 
 forcings = (; b = b_sponge, u = uvw_sponge, v = uvw_sponge, w = uvw_sponge)
 #%%
-struct LagrangianPOC{X, T, A}
+struct LagrangianPOC{X, T, A, R, W}
     x :: X
     y :: X
     z :: X
     release_time :: T
     age :: A
+    radius :: R
+    w_sinking :: W
 end
 
 release_time = CuArray(range(0, stop=stop_time, length=n_particles))
@@ -217,12 +220,22 @@ y_particle = CuArray(rand(n_particles) * Ly)
 z_particle = CuArray(zeros(n_particles))
 age = CuArray(zeros(n_particles))
 
+dist = Pareto(3, 1e-3)
+
+radius = CuArray(rand(dist, n_particles))
 # x_particle = rand(n_particles) * Lx
 # y_particle = rand(n_particles) * Ly
 # z_particle = -0.1 * rand(n_particles) * Lz
 # release_time = collect(range(0, stop=2days, length=n_particles))
 
-particles = StructArray{LagrangianPOC}((x_particle, y_particle, z_particle, release_time, age))
+function calculate_w_sinking(radius)
+    A = -Lz / (stop_time) / 1.5e-3^2
+    return A * radius^2
+end
+
+w_sinking = calculate_w_sinking.(radius)
+
+particles = StructArray{LagrangianPOC}((x_particle, y_particle, z_particle, release_time, age, radius, w_sinking))
 
 @inline function u_sinking_dynamics(x, y, z, u_fluid, particles, p, grid, clock, Δt, model_fields)
     t = clock.time
@@ -237,6 +250,7 @@ end
 end
 
 @inline function w_sinking_dynamics(x, y, z, w_fluid, particles, p, grid, clock, Δt, model_fields)
+    w_sinking = particles.w_sinking[p]
     t = clock.time
     release_time = particles.release_time[p]
     return ifelse(t >= release_time, w_sinking + w_fluid, 0)
