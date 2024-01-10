@@ -108,6 +108,10 @@ function parse_commandline()
         help = "Number of particles to release at regular intervals"
         arg_type = Int64
         default = 2000
+      "--w_sinking"
+        help = "Sinking velocity of particles (m s⁻¹)"
+        arg_type = Float64
+        default = -0.00018518518518518518
     end
     return parse_args(s)
 end
