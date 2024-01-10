@@ -504,6 +504,7 @@ xlims!(axbbar, bbarlim)
 xlims!(axparticle, (0, Lx))
 
 ylims!(axparticle, (-Lz, 0))
+ylims!(axage, (-Lz, 0))
 
 trim!(fig.layout)
 display(fig)

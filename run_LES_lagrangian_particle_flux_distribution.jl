@@ -511,11 +511,12 @@ xlims!(axbbar, bbarlim)
 xlims!(axparticle, (0, Lx))
 
 ylims!(axparticle, (-Lz, 0))
+ylims!(axage, (-Lz, 0))
 
 trim!(fig.layout)
 display(fig)
 
-record(fig, "./Data/$(FILE_NAME).mp4", 1:Nt, framerate=15) do nn
+record(fig, "./Data/$(FILE_NAME).mp4", 1:Nt, framerate=1) do nn
     n[] = nn
 end
 
