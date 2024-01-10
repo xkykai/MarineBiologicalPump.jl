@@ -445,12 +445,13 @@ yC = bbar_data.grid.xᶜᵃᵃ[1:Ny]
 zC = bbar_data.grid.zᵃᵃᶜ[1:Nz]
 
 #%%
-fig = Figure(size=(2000, 2000))
+fig = Figure(size=(2200, 2000))
 
-axb = Axis3(fig[1:2, 1:2], title="b", xlabel="x", ylabel="y", zlabel="z", viewmode=:fitzoom, aspect=:data)
+axb = Axis3(fig[1:3, 1:3], title="b", xlabel="x", ylabel="y", zlabel="z", viewmode=:fitzoom, aspect=:data)
 
-axbbar = Axis(fig[3, 1], title="<b>", xlabel="<b>", ylabel="z")
-axparticle = Axis(fig[3, 2], title="Particle location", xlabel="x", ylabel="z")
+axbbar = Axis(fig[4, 1], title="<b>", xlabel="<b>", ylabel="z")
+axparticle = Axis(fig[4, 2], title="Particle location", xlabel="x", ylabel="z")
+axage = Axis(fig[4, 3], title="Particle age", xlabel="Age (s)", ylabel="z")
 
 xs_xy = xC
 ys_xy = yC
@@ -489,6 +490,7 @@ bₙ_xz = @lift interior(b_xz_data[$n], :, 1, :)
 bbarₙ = @lift interior(bbar_data[$n], 1, 1, :)
 xs_particleₙ = @lift particle_data[$n].x
 zs_particleₙ = @lift particle_data[$n].z
+ages_particleₙ = @lift particle_data[$n].age
 
 b_xy_surface = surface!(axb, xs_xy, ys_xy, zs_xy, color=bₙ_xy, colormap=colormap, colorrange = b_color_range)
 b_yz_surface = surface!(axb, xs_yz, ys_yz, zs_yz, color=bₙ_yz, colormap=colormap, colorrange = b_color_range)
@@ -496,6 +498,7 @@ b_xz_surface = surface!(axb, xs_xz, ys_xz, zs_xz, color=bₙ_xz, colormap=colorm
 
 lines!(axbbar, bbarₙ, zC)
 scatter!(axparticle, xs_particleₙ, zs_particleₙ)
+scatter!(axage, ages_particleₙ, zs_particleₙ)
 
 xlims!(axbbar, bbarlim)
 xlims!(axparticle, (0, Lx))
@@ -510,64 +513,3 @@ record(fig, "./Data/$(FILE_NAME).mp4", 1:Nt, framerate=15) do nn
 end
 
 @info "Animation completed"
-
-#%%
-#%%
-# fig = Figure(resolution=(1800, 1500))
-
-# axubar = Axis(fig[1, 1], title="<u>", xlabel="<u>", ylabel="z")
-# axvbar = Axis(fig[1, 2], title="<v>", xlabel="<v>", ylabel="z")
-# axbbar = Axis(fig[1, 3], title="<b>", xlabel="<b>", ylabel="z")
-# axcbar = Axis(fig[2, 1], title="<c>", xlabel="<c>", ylabel="z")
-
-# ubarlim = (minimum(ubar_data), maximum(ubar_data))
-# vbarlim = (minimum(vbar_data), maximum(vbar_data))
-# bbarlim = (minimum(bbar_data), maximum(bbar_data))
-# cbarlim = (find_min(csbar_data...), find_max(csbar_data...))
-
-# n = Observable(1)
-
-# parameters = jldopen("$(FILE_DIR)/instantaneous_timeseries.jld2", "r") do file
-#     return Dict([(key, file["metadata/parameters/$(key)"]) for key in keys(file["metadata/parameters"])])
-# end 
-
-# time_str = @lift "Qᵁ = $(Qᵁ), Qᴮ = $(Qᴮ), Time = $(round(bbar_data.times[$n]/24/60^2, digits=3)) days"
-# title = Label(fig[0, :], time_str, font=:bold, tellwidth=false)
-
-# ubarₙ = @lift interior(ubar_data[$n], 1, 1, :)
-# vbarₙ = @lift interior(vbar_data[$n], 1, 1, :)
-# bbarₙ = @lift interior(bbar_data[$n], 1, 1, :)
-
-# csbarₙ = [@lift interior(data[$n], 1, 1, :) for data in csbar_data]
-
-# # cmin = @lift find_min([interior(data[$n], 1, 1, :) for data in csbar_data]..., -1e-5)
-# # cmax = @lift find_max([interior(data[$n], 1, 1, :) for data in csbar_data]..., 1e-5)
-
-# # cbarlim = @lift (find_min([interior(data[$n], 1, 1, :) for data in csbar_data]..., -1e-5), find_max([interior(data[$n], 1, 1, :) for data in csbar_data]..., 1e-5))
-
-# lines!(axubar, ubarₙ, zC)
-# lines!(axvbar, vbarₙ, zC)
-# lines!(axbbar, bbarₙ, zC)
-
-# for (i, data) in enumerate(csbarₙ)
-#     lines!(axcbar, data, zC, label="c$(i-1)")
-# end
-
-# Legend(fig[2, 2], axcbar, tellwidth=false)
-
-# xlims!(axubar, ubarlim)
-# xlims!(axvbar, vbarlim)
-# xlims!(axbbar, bbarlim)
-# xlims!(axcbar, cbarlim)
-# # xlims!(axcbar, (cmin[], cmax[]))
-# # xlims!(axcbar, (-0.1, 0.1))
-
-# trim!(fig.layout)
-
-# record(fig, "$(FILE_DIR)/$(FILE_NAME).mp4", 1:Nt, framerate=15) do nn
-#     n[] = nn
-# end
-
-# @info "Animation completed"
-
-# #%%
