@@ -318,7 +318,7 @@ end
     simulation_stopped = simulation.model.clock.time >= simulation.stop_time || simulation.model.clock.iteration >= simulation.stop_iteration
 
     while particle_Δt == 0 && !simulation_stopped
-        @info "while loop triggered"
+        # @info "while loop triggered"
         particle_wizard.next_time_index = min(length(particle_wizard.release_times), particle_wizard.next_time_index + 1)
         particle_Δt = particle_wizard.release_times[particle_wizard.next_time_index] - simulation.model.clock.time
     end
@@ -451,7 +451,7 @@ yC = bbar_data.grid.xᶜᵃᵃ[1:Ny]
 zC = bbar_data.grid.zᵃᵃᶜ[1:Nz]
 
 #%%
-fig = Figure(resolution=(2000, 2000))
+fig = Figure(size=(2000, 2000))
 
 axb = Axis3(fig[1:2, 1:2], title="b", xlabel="x", ylabel="y", zlabel="z", viewmode=:fitzoom, aspect=:data)
 
@@ -495,13 +495,14 @@ bₙ_xz = @lift interior(b_xz_data[$n], :, 1, :)
 bbarₙ = @lift interior(bbar_data[$n], 1, 1, :)
 xs_particleₙ = @lift particle_data[$n].x
 zs_particleₙ = @lift particle_data[$n].z
+markersizesₙ = @lift 9 * particle_data[$n].radius ./ 0.0015
 
 b_xy_surface = surface!(axb, xs_xy, ys_xy, zs_xy, color=bₙ_xy, colormap=colormap, colorrange = b_color_range)
 b_yz_surface = surface!(axb, xs_yz, ys_yz, zs_yz, color=bₙ_yz, colormap=colormap, colorrange = b_color_range)
 b_xz_surface = surface!(axb, xs_xz, ys_xz, zs_xz, color=bₙ_xz, colormap=colormap, colorrange = b_color_range)
 
 lines!(axbbar, bbarₙ, zC)
-scatter!(axparticle, xs_particleₙ, zs_particleₙ)
+scatter!(axparticle, xs_particleₙ, zs_particleₙ, markersize=markersizesₙ)
 
 xlims!(axbbar, bbarlim)
 xlims!(axparticle, (0, Lx))

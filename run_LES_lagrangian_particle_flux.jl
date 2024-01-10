@@ -304,7 +304,7 @@ end
     simulation_stopped = simulation.model.clock.time >= simulation.stop_time || simulation.model.clock.iteration >= simulation.stop_iteration
 
     while particle_Δt == 0 && !simulation_stopped
-        @info "while loop triggered"
+        # @info "while loop triggered"
         particle_wizard.next_time_index = min(length(particle_wizard.release_times), particle_wizard.next_time_index + 1)
         particle_Δt = particle_wizard.release_times[particle_wizard.next_time_index] - simulation.model.clock.time
     end
@@ -437,7 +437,7 @@ yC = bbar_data.grid.xᶜᵃᵃ[1:Ny]
 zC = bbar_data.grid.zᵃᵃᶜ[1:Nz]
 
 #%%
-fig = Figure(resolution=(2000, 2000))
+fig = Figure(size=(2000, 2000))
 
 axb = Axis3(fig[1:2, 1:2], title="b", xlabel="x", ylabel="y", zlabel="z", viewmode=:fitzoom, aspect=:data)
 
