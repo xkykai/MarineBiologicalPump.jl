@@ -104,6 +104,10 @@ function parse_commandline()
         help = "Location to save files"
         arg_type = String
         default = "."
+      "--n_particles"
+        help = "Number of particles to release at regular intervals"
+        arg_type = Int64
+        default = 2000
     end
     return parse_args(s)
 end
@@ -172,7 +176,7 @@ function find_max(a...)
     return maximum(maximum.([a...]))
 end
 
-FILE_NAME = "Lagrangian_n_particles_$(n_particles)_QU_$(Qᵁ)_QB_$(Qᴮ)_dbdz_$(dbdz)_Lxz_$(Lx)_$(Lz)_Nxz_$(Nx)_$(Nz)_w_$(w_sinking)_$(advection)"
+FILE_NAME = "Lagrangian_n_particles_$(n_particles)_QU_$(Qᵁ)_QB_$(Qᴮ)_dbdz_$(dbdz)_Lxz_$(Lx)_$(Lz)_Nxz_$(Nx)_$(Nz)_w_$(w_sinking)_$(args["advection"])"
 FILE_DIR = "LES/$(FILE_NAME)"
 mkpath(FILE_DIR)
 
