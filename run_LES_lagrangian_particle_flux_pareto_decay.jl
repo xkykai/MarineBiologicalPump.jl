@@ -229,7 +229,7 @@ radius = CuArray(rand(dist, n_particles))
 # release_time = collect(range(0, stop=2days, length=n_particles))
 
 @inline function calculate_w_sinking(radius)
-    A = -Lz / (stop_time) / 1.5e-3^2
+    A = -4Lz / (stop_time) / 1.5e-3^2
     return A * radius^2
 end
 
@@ -498,7 +498,8 @@ bbarₙ = @lift interior(bbar_data[$n], 1, 1, :)
 xs_particleₙ = @lift particle_data[$n].x
 zs_particleₙ = @lift particle_data[$n].z
 ages_particleₙ = @lift particle_data[$n].age ./ (24 * 60^2)
-markersizesₙ = @lift 9 * particle_data[$n].radius ./ 0.0015
+# markersizesₙ = @lift 9 * particle_data[$n].radius ./ 0.0015
+markersizesₙ = @lift 9 * particle_data[$n].radius .* (particle_data[$n].age .!= 0) ./ mean(particle_data[$n].radius[particle_data[$n].age .!= 0])
 
 b_xy_surface = surface!(axb, xs_xy, ys_xy, zs_xy, color=bₙ_xy, colormap=colormap, colorrange = b_color_range)
 b_yz_surface = surface!(axb, xs_yz, ys_yz, zs_yz, color=bₙ_yz, colormap=colormap, colorrange = b_color_range)
