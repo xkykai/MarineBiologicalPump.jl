@@ -519,7 +519,7 @@ xlims!(axparticle, (0, Lx))
 ylims!(axparticle, (-Lz, 0))
 ylims!(axage, (-Lz, 0))
 
-trim!(fig.layout)
+CairoMakie.trim!(fig.layout)
 display(fig)
 
 record(fig, "./Data/$(FILE_NAME).mp4", 1:Nt, framerate=15) do nn
@@ -611,6 +611,7 @@ record(fig, "./Data/$(FILE_NAME)_distribution.mp4", 2:Nt, framerate=15) do nn
     rainclouds!(axagedist, depth_categories, age_categories, clouds=hist, plot_boxplots=true, orientation=:horizontal, markersize=3, color=line.attributes.color)
     xlims!(axage, (nothing, nothing))
     xlims!(axagedist, (-10, 5))
+    CairoMakie.trim!(fig.layout)
 end
 
 @info "Distribution animation completed"
