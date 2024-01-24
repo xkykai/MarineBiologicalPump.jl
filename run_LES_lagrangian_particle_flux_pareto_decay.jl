@@ -15,6 +15,7 @@ using KernelAbstractions
 using Oceananigans.Architectures: device, architecture
 using ArgParse
 using Distributions
+using StatsBase
 
 function parse_commandline()
     s = ArgParseSettings()
@@ -165,6 +166,8 @@ const pickup = args["pickup"]
 
 const stop_time = args["stop_time"]days
 
+const A = -Lz / (2*24 * 60^2) / 1e-3^2
+
 function find_min(a...)
     return minimum(minimum.([a...]))
 end
@@ -173,7 +176,7 @@ function find_max(a...)
     return maximum(maximum.([a...]))
 end
 
-FILE_NAME = "Lagrangian_Pareto_decay_n_particles_$(n_particles)_QU_$(Qᵁ)_QB_$(Qᴮ)_dbdz_$(dbdz)_Lxz_$(Lx)_$(Lz)_Nxz_$(Nx)_$(Nz)_$(args["advection"])"
+FILE_NAME = "Lagrangian_Pareto_decay_n_particles_$(n_particles)_A_$(A)_QU_$(Qᵁ)_QB_$(Qᴮ)_dbdz_$(dbdz)_Lxz_$(Lx)_$(Lz)_Nxz_$(Nx)_$(Nz)_$(args["advection"])"
 FILE_DIR = "LES/$(FILE_NAME)"
 mkpath(FILE_DIR)
 
@@ -220,7 +223,7 @@ y_particle = CuArray(rand(n_particles) * Ly)
 z_particle = CuArray(zeros(n_particles))
 age = CuArray(zeros(n_particles))
 
-dist = Pareto(3, 1e-3)
+dist = Pareto(3, 5e-3)
 
 radius = CuArray(rand(dist, n_particles))
 # x_particle = rand(n_particles) * Lx
@@ -229,7 +232,6 @@ radius = CuArray(rand(dist, n_particles))
 # release_time = collect(range(0, stop=2days, length=n_particles))
 
 @inline function calculate_w_sinking(radius)
-    A = -4Lz / (stop_time) / 1.5e-3^2
     return A * radius^2
 end
 
@@ -370,6 +372,7 @@ function init_save_some_metadata!(file, model)
     file["metadata/parameters/buoyancy_flux"] = Qᴮ
     file["metadata/parameters/dbdz"] = dbdz
     file["metadata/parameters/b_surface"] = b_surface
+    file["metadata/parameters/n_particles"] = n_particles
     return nothing
 end
 
@@ -499,7 +502,7 @@ xs_particleₙ = @lift particle_data[$n].x
 zs_particleₙ = @lift particle_data[$n].z
 ages_particleₙ = @lift particle_data[$n].age ./ (24 * 60^2)
 # markersizesₙ = @lift 9 * particle_data[$n].radius ./ 0.0015
-markersizesₙ = @lift 9 * particle_data[$n].radius .* (particle_data[$n].age .!= 0) ./ mean(particle_data[$n].radius[particle_data[$n].age .!= 0])
+markersizesₙ = @lift ifelse($n == 1, 9 .* ones(n_particles), 9 * particle_data[$n].radius .* (particle_data[$n].age .!= 0) ./ mean(particle_data[$n].radius[particle_data[$n].age .!= 0]))
 
 b_xy_surface = surface!(axb, xs_xy, ys_xy, zs_xy, color=bₙ_xy, colormap=colormap, colorrange = b_color_range)
 b_yz_surface = surface!(axb, xs_yz, ys_yz, zs_yz, color=bₙ_yz, colormap=colormap, colorrange = b_color_range)
@@ -525,3 +528,90 @@ record(fig, "./Data/$(FILE_NAME).mp4", 1:Nt, framerate=15) do nn
 end
 
 @info "Animation completed"
+
+particles_data = jldopen("$(FILE_DIR)/particles.jld2", "r")
+
+iters = keys(particles_data["timeseries/t"])
+times = [particles_data["timeseries/t/$(iter)"] for iter in iters]
+particles_timeseries = [particles_data["timeseries/particles/$(iter)"] for iter in iters]
+
+parameters = Dict([(key, particles_data["metadata/parameters/$(key)"]) for key in keys(particles_data["metadata/parameters"])])
+grid = Dict([(key, particles_data["grid/$(key)"]) for key in keys(particles_data["grid"])])
+close(particles_data)
+
+bbar_data = FieldTimeSeries("$(FILE_DIR)/instantaneous_timeseries.jld2", "bbar")
+
+bbarlim = (minimum(bbar_data), maximum(bbar_data))
+
+Nt = length(bbar_data.times)
+
+xC = bbar_data.grid.xᶜᵃᵃ[1:Nx]
+yC = bbar_data.grid.xᶜᵃᵃ[1:Ny]
+zC = bbar_data.grid.zᵃᵃᶜ[1:Nz]
+
+binsize = 16
+bins = -Lz:binsize:0
+nbins = length(bins)
+
+function get_age_bin(bins, obs)
+    bin_index = searchsortedlast.(Ref(bins), obs.z)
+    return (; z=[obs.z[bin_index .== i] for i in eachindex(bins)],
+              age=[obs.age[bin_index .== i] ./ (24 * 60^2) for i in eachindex(bins)], 
+              radius=[obs.radius[bin_index .== i] for i in eachindex(bins)],
+              age_radius³ =[log.((obs.age[bin_index .== i] .* obs.radius[bin_index .== i].^3) ./ mean(obs.age[bin_index .== i] .* obs.radius[bin_index .== i].^3)) for i in eachindex(bins)],
+              empty=[sum(bin_index .== i) > 1 for i in eachindex(bins)])
+end
+
+binned_ages_data = get_age_bin.(Ref(bins), particles_timeseries)
+
+#%%
+fig = Figure(size=(1000, 1000))
+
+axbbar = Axis(fig[1, 1], title="<b>", xlabel="<b>", ylabel="z")
+axparticle = Axis(fig[1, 2], title="Particle location", xlabel="x", ylabel="z")
+axage = Axis(fig[2, 1], title="Particle age", xlabel="Age (days)", ylabel="z")
+axagedist = Axis(fig[2, 2], title="Mass-weighted age distribution, bin size $(binsize) m", xlabel="log[(Age * radius³) / <Age * radius³>]", ylabel="z", yticks=(1:nbins, string.(bins)))
+
+n = Observable(2)
+
+time_str = @lift "Qᵁ = $(Qᵁ), Qᴮ = $(Qᴮ), Time = $(round(bbar_data.times[$n]/24/60^2, digits=3)) days"
+title = Label(fig[0, :], time_str, font=:bold, tellwidth=false)
+
+bbarₙ = @lift interior(bbar_data[$n], 1, 1, :)
+xs_particleₙ = @lift particles_timeseries[$n].x
+zs_particleₙ = @lift particles_timeseries[$n].z
+ages_particleₙ = @lift particles_timeseries[$n].age ./ (24 * 60^2)
+# markersizesₙ = @lift 9 * particle_data[$n].radius ./ 0.0015
+markersizesₙ = @lift ifelse($n == 1, 3 .* ones(n_particles), 3 * particles_timeseries[$n].radius .* (particles_timeseries[$n].age .!= 0) ./ mean(particles_timeseries[$n].radius[particles_timeseries[$n].age .!= 0]))
+
+# depth_categoriesₙ = @lift (1:9)[binned_ages_data[$n].empty][1:end-1]
+# age_categoriesₙ = @lift (binned_ages_data[$n].age_radius³)[binned_ages_data[$n].empty][1:end-1]
+
+line = lines!(axbbar, bbarₙ, zC)
+scatter!(axparticle, xs_particleₙ, zs_particleₙ, markersize=markersizesₙ)
+scatter!(axage, ages_particleₙ, zs_particleₙ, markersize=markersizesₙ)
+
+# raincloud = rainclouds!(axagedist, depth_categoriesₙ, age_categoriesₙ, clouds=hist, plot_boxplots=true, orientation=:horizontal, markersize=3)
+ylims!(axagedist, (0.5, nbins))
+
+xlims!(axbbar, bbarlim)
+xlims!(axparticle, (0, Lx))
+# xlims!(axage, (0, 2days))
+
+ylims!(axparticle, (-Lz, 0))
+ylims!(axage, (-Lz, 0))
+
+display(fig)
+
+record(fig, "./Data/$(FILE_NAME)_distribution.mp4", 2:Nt, framerate=15) do nn
+    n[] = nn
+    depth_categories = (1:9)[binned_ages_data[nn].empty][1:end-1]
+    age_categories = (binned_ages_data[nn].age_radius³)[binned_ages_data[nn].empty][1:end-1]
+    empty!(axagedist)
+    rainclouds!(axagedist, depth_categories, age_categories, clouds=hist, plot_boxplots=true, orientation=:horizontal, markersize=3, color=line.attributes.color)
+    xlims!(axage, (nothing, nothing))
+    xlims!(axagedist, (-10, 5))
+end
+
+@info "Distribution animation completed"
+#%%
