@@ -41,6 +41,14 @@ function parse_commandline()
         help = "Coriolis parameter (s⁻¹)"
         arg_type = Float64
         default = 1e-4
+      "--alpha"
+        help = "Pareto distribution shape parameter"
+        arg_type = Float64
+        default = 3.
+      "--min_radius"
+        help = "Minimum radius of particles"
+        arg_type = Float64
+        default = 5e-3
       "--Nz"
         help = "Number of grid points in z-direction"
         arg_type = Int64
@@ -158,6 +166,8 @@ end
 # const Qᴮ = 0
 const f = args["f"]
 const n_particles = args["n_particles"]
+const α = args["alpha"]
+const min_radius = args["min_radius"]
 
 const dbdz = args["dbdz"]
 const b_surface = args["b_surface"]
@@ -176,7 +186,7 @@ function find_max(a...)
     return maximum(maximum.([a...]))
 end
 
-FILE_NAME = "Lagrangian_Pareto_decay_n_particles_$(n_particles)_A_$(A)_QU_$(Qᵁ)_QB_$(Qᴮ)_dbdz_$(dbdz)_Lxz_$(Lx)_$(Lz)_Nxz_$(Nx)_$(Nz)_$(args["advection"])"
+FILE_NAME = "Lagrangian_Pareto_decay_alpha_$(α)_rmin_$(min_radius)_n_particles_$(n_particles)_A_$(A)_QU_$(Qᵁ)_QB_$(Qᴮ)_dbdz_$(dbdz)_Lxz_$(Lx)_$(Lz)_Nxz_$(Nx)_$(Nz)_$(args["advection"])"
 FILE_DIR = "LES/$(FILE_NAME)"
 mkpath(FILE_DIR)
 
@@ -223,7 +233,7 @@ y_particle = CuArray(rand(n_particles) * Ly)
 z_particle = CuArray(zeros(n_particles))
 age = CuArray(zeros(n_particles))
 
-dist = Pareto(3, 5e-3)
+dist = Pareto(α, min_radius)
 
 radius = CuArray(rand(dist, n_particles))
 # x_particle = rand(n_particles) * Lx
@@ -522,7 +532,7 @@ ylims!(axage, (-Lz, 0))
 CairoMakie.trim!(fig.layout)
 display(fig)
 
-record(fig, "./Data/$(FILE_NAME).mp4", 1:Nt, framerate=15) do nn
+record(fig, "./LES/$(FILE_NAME).mp4", 1:Nt, framerate=15) do nn
     n[] = nn
     xlims!(axage, (nothing, nothing))
 end
@@ -555,22 +565,26 @@ nbins = length(bins)
 
 function get_age_bin(bins, obs)
     bin_index = searchsortedlast.(Ref(bins), obs.z)
-    return (; z=[obs.z[bin_index .== i] for i in eachindex(bins)],
-              age=[obs.age[bin_index .== i] ./ (24 * 60^2) for i in eachindex(bins)], 
-              radius=[obs.radius[bin_index .== i] for i in eachindex(bins)],
-              age_radius³ =[log.((obs.age[bin_index .== i] .* obs.radius[bin_index .== i].^3) ./ mean(obs.age[bin_index .== i] .* obs.radius[bin_index .== i].^3)) for i in eachindex(bins)],
-              empty=[sum(bin_index .== i) > 1 for i in eachindex(bins)])
+    z = [obs.z[bin_index .== i] for i in eachindex(bins)]
+    age = [obs.age[bin_index .== i] ./ (24 * 60^2) for i in eachindex(bins)]
+    radius = [obs.radius[bin_index .== i] for i in eachindex(bins)]
+    # mean_age_radius³ = mean((obs.age .* obs.radius .^ 3)[obs.age .!= 0])
+    # age_radius³_normalized = [(obs.age[bin_index .== i] .* obs.radius[bin_index .== i].^3) ./ mean_age_radius³ for i in eachindex(bins)]
+    mean_radius³ = mean((obs.radius .^ 3)[obs.age .!= 0])
+    age_radius³_normalized = [(obs.age[bin_index .== i] .* obs.radius[bin_index .== i].^3) ./ mean_radius³ for i in eachindex(bins)]
+    empty = [sum(bin_index .== i) > 1 for i in eachindex(bins)]
+    return (; z, age, radius, age_radius³_normalized, empty)
 end
 
 binned_ages_data = get_age_bin.(Ref(bins), particles_timeseries)
 
 #%%
-fig = Figure(size=(1000, 1000))
+fig = Figure(size=(2200, 1000))
 
 axbbar = Axis(fig[1, 1], title="<b>", xlabel="<b>", ylabel="z")
 axparticle = Axis(fig[1, 2], title="Particle location", xlabel="x", ylabel="z")
-axage = Axis(fig[2, 1], title="Particle age", xlabel="Age (days)", ylabel="z")
-axagedist = Axis(fig[2, 2], title="Mass-weighted age distribution, bin size $(binsize) m", xlabel="log[(Age * radius³) / <Age * radius³>]", ylabel="z", yticks=(1:nbins, string.(bins)))
+axage = Axis(fig[1, 3], title="Particle age", xlabel="Age (days)", ylabel="z")
+axagedist = Axis(fig[1, 4], title="Mass-weighted age distribution, bin size $(binsize) m", xlabel="(Age * radius³) / <Radius³>", ylabel="z", yticks=(1:nbins, string.(bins)))
 
 n = Observable(2)
 
@@ -603,14 +617,16 @@ ylims!(axage, (-Lz, 0))
 
 display(fig)
 
-record(fig, "./Data/$(FILE_NAME)_distribution.mp4", 2:Nt, framerate=15) do nn
+record(fig, "$(FILE_DIR)/$(FILE_NAME)_distribution_nonorm.mp4", 2:Nt, framerate=15) do nn
     n[] = nn
-    depth_categories = (1:9)[binned_ages_data[nn].empty][1:end-1]
-    age_categories = (binned_ages_data[nn].age_radius³)[binned_ages_data[nn].empty][1:end-1]
+    category_index = (binned_ages_data[nn].empty)[2:end-1]
+    depth_categories = (1:length(bins))[2:end-1][category_index]
+    age_categories = (binned_ages_data[nn].age_radius³_normalized)[2:end-1][category_index]
     empty!(axagedist)
     rainclouds!(axagedist, depth_categories, age_categories, clouds=hist, plot_boxplots=true, orientation=:horizontal, markersize=3, color=line.attributes.color)
     xlims!(axage, (nothing, nothing))
-    xlims!(axagedist, (-10, 5))
+    # xlims!(axagedist, (-10, 5))
+    xlims!(axagedist, (nothing, nothing))
     CairoMakie.trim!(fig.layout)
 end
 
