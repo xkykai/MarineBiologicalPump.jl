@@ -52,15 +52,15 @@ function parse_commandline()
       "--Nz"
         help = "Number of grid points in z-direction"
         arg_type = Int64
-        default = 128
+        default = 4
       "--Nx"
         help = "Number of grid points in x-direction"
         arg_type = Int64
-        default = 128
+        default = 4
       "--Ny"
         help = "Number of grid points in y-direction"
         arg_type = Int64
-        default = 128
+        default = 4
       "--Lz"
         help = "Domain depth"
         arg_type = Float64
