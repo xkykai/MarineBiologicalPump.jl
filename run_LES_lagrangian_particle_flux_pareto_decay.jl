@@ -625,7 +625,7 @@ ylims!(axage, (-Lz, 0))
 
 display(fig)
 
-record(fig, "$(FILE_DIR)/$(FILE_NAME)_distribution_nonorm.mp4", 2:Nt, framerate=15) do nn
+CairoMakie.record(fig, "$(FILE_DIR)/$(FILE_NAME)_distribution_nonorm.mp4", 2:Nt, framerate=15) do nn
     n[] = nn
     category_index = (binned_ages_data[nn].empty)[2:end-1]
     depth_categories = (1:length(bins))[2:end-1][category_index]
