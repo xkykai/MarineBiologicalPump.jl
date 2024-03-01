@@ -16,6 +16,7 @@ using Oceananigans.Architectures: device, architecture
 using ArgParse
 using Distributions
 using StatsBase
+using Glob
 include("correct_reduction_oceananigans.jl")
 
 function parse_commandline()
@@ -443,6 +444,12 @@ if pickup
 else
     run!(simulation)
 end
+
+checkpointers = glob("$(FILE_DIR)/model_checkpoint_iteration*.jld2")
+if !isempty(checkpointers)
+    rm.(checkpointers)
+end
+
 #%%
 b_xy_data = FieldTimeSeries("$(FILE_DIR)/instantaneous_fields_xy.jld2", "b", backend=OnDisk())
 b_xz_data = FieldTimeSeries("$(FILE_DIR)/instantaneous_fields_xz.jld2", "b", backend=OnDisk())
