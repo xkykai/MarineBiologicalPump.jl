@@ -16,6 +16,7 @@ using Oceananigans.Architectures: device, architecture
 using ArgParse
 using Distributions
 using StatsBase
+include("correct_reduction_oceananigans.jl")
 
 function parse_commandline()
     s = ArgParseSettings()
