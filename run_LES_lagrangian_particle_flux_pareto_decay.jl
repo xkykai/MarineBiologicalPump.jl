@@ -282,6 +282,9 @@ particle_velocities = ParticleVelocities(u=particle_forcing_u, v=particle_forcin
         particles.radius[p] = ifelse(particles.age[p] > 0, particles.radius[p] * (1 -  Δt/(3*particles.age[p])), particles.radius[p])
         particles.w_sinking[p] = calculate_w_sinking(particles.radius[p])
     end
+    # particles.age[p] = ifelse(clock.time >= particles.release_time[p], particles.age[p] + Δt, particles.age[p])
+    # particles.radius[p] = ifelse(particles.age[p] > 0, particles.radius[p] * (1 -  Δt/(3*particles.age[p])), particles.radius[p])
+    # particles.w_sinking[p] = calculate_w_sinking(particles.radius[p])
 end
 
 function update_lagrangian_particle_properties!(particles, model, Δt)
@@ -361,10 +364,10 @@ function print_progress(sim)
             sim.model.clock.iteration,
             prettytime(sim.model.clock.time),
             prettytime(1e-9 * (time_ns() - wall_clock[1])),
-            maximum(abs, sim.model.velocities.u),
-            maximum(abs, sim.model.velocities.v),
-            maximum(abs, sim.model.velocities.w),
-            maximum(abs, sim.model.tracers.b),
+            maximum(sim.model.velocities.u),
+            maximum(sim.model.velocities.v),
+            minimum(sim.model.velocities.w),
+            maximum(sim.model.tracers.b),
             mean(lagrangian_particles.properties.x),
             mean(lagrangian_particles.properties.y),
             mean(lagrangian_particles.properties.z),
