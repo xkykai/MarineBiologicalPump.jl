@@ -125,7 +125,6 @@ end
 
 args = parse_commandline()
 
-
 Random.seed!(123)
 
 const Lz = args["Lz"]
@@ -378,7 +377,7 @@ function print_progress(sim)
     return nothing
 end
 
-simulation.callbacks[:print_progress] = Callback(print_progress, IterationInterval(1000))
+simulation.callbacks[:print_progress] = Callback(print_progress, IterationInterval(1))
 
 function init_save_some_metadata!(file, model)
     file["metadata/author"] = "Xin Kai Lee"
@@ -543,7 +542,7 @@ ylims!(axage, (-Lz, 0))
 CairoMakie.trim!(fig.layout)
 display(fig)
 
-record(fig, "./LES/$(FILE_NAME).mp4", 1:Nt, framerate=15) do nn
+CairoMakie.record(fig, "./LES/$(FILE_NAME).mp4", 1:Nt, framerate=15) do nn
     n[] = nn
     xlims!(axage, (nothing, nothing))
 end
