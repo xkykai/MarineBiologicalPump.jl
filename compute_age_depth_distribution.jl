@@ -6,12 +6,12 @@ using Statistics
 using ArgParse
 using LsqFit
 
-filename = "Lagrangian_Pareto_decay_alpha_2.0_rmin_0.005_n_particles_50000_A_-1481.4814814814815_QU_0.0_QB_2.0e-7_dbdz_0.0001_Lxz_128.0_256.0_Nxz_128_256_AMD"
+filename = "Lagrangian_Pareto_decay_alpha_1.0_rmin_0.005_n_particles_50000_A_-1481.4814814814815_QU_-2.0e-5_QB_0.0_dbdz_0.0001_Lxz_128.0_256.0_Nxz_128_256_AMD"
 FILE_DIR = "./LES/$(filename)"
 
 particles_data = jldopen("$(FILE_DIR)/particles.jld2", "r")
 
-size_spectrum = -3
+size_spectrum = -2
 
 iters = keys(particles_data["timeseries/t"])
 times = [particles_data["timeseries/t/$(iter)"] for iter in iters]
@@ -103,10 +103,6 @@ axbbar = Axis(fig[1, 1], title="<b>", xlabel="Buoyancy (m s⁻²)", ylabel="z (m
 axbox = Axis(fig[1, 2], title="Time-averaged particle age", xlabel="Mass-weighted age (s)", ylabel="z (m)")
 axviolin = Axis(fig[1, 3], title="Time-averaged particle age", xlabel="Mass-weighted age (s)", ylabel="z (m)")
 
-n = Observable(1000)
-
-bbarₙ = @lift interior(bbar_data[$n], 1, 1, :)
-
 n_start = 900
 n_end = Nt
 is_top_bottomₙ = vcat([[bin == 1 || bin == nbins for bin in bin_data[n].index] for n in n_start:n_end]...)
@@ -117,9 +113,9 @@ mean_age_normalized = mean.(vcat.([bin_data[n].data.age_normalized[2:end-1] for 
 median_age_normalized = median.(vcat.([bin_data[n].data.age_normalized[2:end-1] for n in n_start:n_end]...))
 p0 = [-10., 20]
 
-bins_curvefit = bins[2:end-1][1:end-4]
-mean_age_curvefit = mean_age_normalized[1:end-4]
-median_age_curvefit = median_age_normalized[1:end-4]
+bins_curvefit = bins[2:end-1][1:end-1]
+mean_age_curvefit = mean_age_normalized[1:end-1]
+median_age_curvefit = median_age_normalized[1:end-1]
 
 fit_mean = curve_fit(linear, bins_curvefit, mean_age_curvefit, p0)
 fit_median = curve_fit(linear, bins_curvefit, median_age_curvefit, p0)
@@ -130,19 +126,20 @@ line = lines!(axbbar, interior(bbar_data[n_start], 1, 1, :), zC, label="Start")
 lines!(axbbar, interior(bbar_data[n_end], 1, 1, :), zC, label="End")
 axislegend(axbbar, position=:rb)
 
-agelim = (0, quantile(selected_age_normalized[selected_bin_categories .== minimum(selected_bin_categories)], 0.9))
+# agelim = (0, quantile(selected_age_normalized[selected_bin_categories .== minimum(selected_bin_categories)], 0.99))
+agelim = (0, 0.2)
 
 # density!(axparticle, agesₙ)
 box = boxplot!(axbox, selected_bin_categories, selected_age_normalized, orientation=:horizontal, show_outliers=false, width=binsize/2, color=line.attributes.color)
-scatter!(axbox, mean_age_normalized, bins[2:end-1], color=:red, markersize=15, label="Mean")
-lines!(axbox, linear(bins_curvefit, fit_mean.param), bins_curvefit, color=:red, label="Mean regression, gradient = $(round(fit_mean.param[1], digits=3))")
+# scatter!(axbox, mean_age_normalized, bins[2:end-1], color=:red, markersize=15, label="Mean")
+# lines!(axbox, linear(bins_curvefit, fit_mean.param), bins_curvefit, color=:red, label="Mean regression, gradient = $(round(fit_mean.param[1], digits=3))")
 lines!(axbox, linear(bins_curvefit, fit_median.param), bins_curvefit, color=:black, label="Median regression, gradient = $(round(fit_median.param[1], digits=3))")
 axislegend(axbox, position=:rt)
 
-violin!(axviolin, selected_bin_categories, selected_age_normalized, orientation=:horizontal, color=line.attributes.color, width=binsize*4, side=:right, datalimits=agelim)
-# violin!(axviolin, selected_bin_categories, selected_age_normalized, orientation=:horizontal, color=line.attributes.color, width=binsize*4, side=:right)
+# violin!(axviolin, selected_bin_categories, selected_age_normalized, orientation=:horizontal, color=line.attributes.color, width=binsize*4, side=:right, datalimits=agelim)
+violin!(axviolin, selected_bin_categories, selected_age_normalized, orientation=:horizontal, color=line.attributes.color, width=binsize*4, side=:right)
 
-linkxaxes!(axbox, axviolin)
+# linkxaxes!(axbox, axviolin)
 
 Qᵁ = parameters["momentum_flux"]
 Qᴮ = parameters["buoyancy_flux"]
