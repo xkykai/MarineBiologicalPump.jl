@@ -281,9 +281,6 @@ particle_velocities = ParticleVelocities(u=particle_forcing_u, v=particle_forcin
         particles.radius[p] = ifelse(particles.age[p] > 0, particles.radius[p] * (1 -  Δt/(3*particles.age[p])), particles.radius[p])
         particles.w_sinking[p] = calculate_w_sinking(particles.radius[p])
     end
-    # particles.age[p] = ifelse(clock.time >= particles.release_time[p], particles.age[p] + Δt, particles.age[p])
-    # particles.radius[p] = ifelse(particles.age[p] > 0, particles.radius[p] * (1 -  Δt/(3*particles.age[p])), particles.radius[p])
-    # particles.w_sinking[p] = calculate_w_sinking(particles.radius[p])
 end
 
 function update_lagrangian_particle_properties!(particles, model, Δt)
@@ -298,7 +295,6 @@ function update_lagrangian_particle_properties!(particles, model, Δt)
     return nothing
 end
 
-# lagrangian_particles = LagrangianParticles(particles, advective_velocity=particle_velocities)
 lagrangian_particles = LagrangianParticles(particles, advective_velocity=particle_velocities, dynamics=update_lagrangian_particle_properties!)
 
 #%%
@@ -320,9 +316,9 @@ set!(model, b=b_initial_noisy)
 b = model.tracers.b
 u, v, w = model.velocities
 
-simulation = Simulation(model, Δt=0.1seconds, stop_time=stop_time)
+simulation = Simulation(model, Δt=args["dt"]seconds, stop_time=stop_time)
 
-wizard = TimeStepWizard(max_change=1.1, max_Δt=10minutes, cfl=0.6)
+wizard = TimeStepWizard(max_change=1.1, max_Δt=args["max_dt"]seconds, cfl=0.6)
 
 mutable struct ParticleTimeStepWizard{W, RT, T}
     wizard :: W
@@ -451,7 +447,6 @@ checkpointers = glob("$(FILE_DIR)/model_checkpoint_iteration*.jld2")
 if !isempty(checkpointers)
     rm.(checkpointers)
 end
-
 #%%
 b_xy_data = FieldTimeSeries("$(FILE_DIR)/instantaneous_fields_xy.jld2", "b", backend=OnDisk())
 b_xz_data = FieldTimeSeries("$(FILE_DIR)/instantaneous_fields_xz.jld2", "b", backend=OnDisk())
