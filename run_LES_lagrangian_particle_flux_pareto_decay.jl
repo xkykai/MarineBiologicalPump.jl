@@ -110,7 +110,7 @@ function parse_commandline()
       "--advection"
         help = "Advection scheme used"
         arg_type = String
-        default = "AMD"
+        default = "WENO9nu0"
       "--file_location"
         help = "Location to save files"
         arg_type = String
