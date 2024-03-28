@@ -346,7 +346,7 @@ end
 end
 
 particle_wizard = ParticleTimeStepWizard(wizard, Array(release_time), 1)
-simulation.callbacks[:particle_wizard] = Callback(particle_wizard, IterationInterval(100))
+simulation.callbacks[:particle_wizard] = Callback(particle_wizard, IterationInterval(1))
 
 # simulation.callbacks[:wizard] = Callback(wizard, IterationInterval(1))
 
@@ -373,7 +373,7 @@ function print_progress(sim)
     return nothing
 end
 
-simulation.callbacks[:print_progress] = Callback(print_progress, IterationInterval(1))
+simulation.callbacks[:print_progress] = Callback(print_progress, IterationInterval(100))
 
 function init_save_some_metadata!(file, model)
     file["metadata/author"] = "Xin Kai Lee"
