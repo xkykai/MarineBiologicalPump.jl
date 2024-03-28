@@ -346,7 +346,7 @@ end
 end
 
 particle_wizard = ParticleTimeStepWizard(wizard, Array(release_time), 1)
-simulation.callbacks[:particle_wizard] = Callback(particle_wizard, IterationInterval(1))
+simulation.callbacks[:particle_wizard] = Callback(particle_wizard, IterationInterval(100))
 
 # simulation.callbacks[:wizard] = Callback(wizard, IterationInterval(1))
 
