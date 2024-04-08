@@ -235,7 +235,7 @@ release_time = CuArray(range(0, stop=stop_time, length=n_particles))
 x_particle = CuArray(rand(n_particles) * Lx)
 y_particle = CuArray(rand(n_particles) * Ly)
 z_particle = CuArray(zeros(n_particles))
-age = CuArray(zeros(initial_age, n_particles))
+age = CuArray(fill(initial_age, n_particles))
 
 dist = Pareto(α, min_radius)
 
