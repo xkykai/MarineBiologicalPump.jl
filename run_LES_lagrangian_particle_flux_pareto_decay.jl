@@ -177,7 +177,10 @@ const pickup = args["pickup"]
 
 const stop_time = args["stop_time"]days
 
-const A = -Lz / (2*24 * 60^2) / 1e-3^2
+const A = -128 / (24 * 60^2) / 1e-3^2
+# const A = -Lz / (24 * 60^2) / 1e-3^2
+
+const initial_age = 1000.
 
 function find_min(a...)
     return minimum(minimum.([a...]))
@@ -232,7 +235,7 @@ release_time = CuArray(range(0, stop=stop_time, length=n_particles))
 x_particle = CuArray(rand(n_particles) * Lx)
 y_particle = CuArray(rand(n_particles) * Ly)
 z_particle = CuArray(zeros(n_particles))
-age = CuArray(zeros(n_particles))
+age = CuArray(zeros(initial_age, n_particles))
 
 dist = Pareto(α, min_radius)
 
