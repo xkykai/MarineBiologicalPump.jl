@@ -473,79 +473,79 @@ yC = bbar_data.grid.xᶜᵃᵃ[1:Ny]
 zC = bbar_data.grid.zᵃᵃᶜ[1:Nz]
 
 #%%
-fig = Figure(size=(2200, 2000))
+# fig = Figure(size=(2200, 2000))
 
-axb = Axis3(fig[1:3, 1:3], title="b", xlabel="x", ylabel="y", zlabel="z", viewmode=:fitzoom, aspect=:data)
+# axb = Axis3(fig[1:3, 1:3], title="b", xlabel="x", ylabel="y", zlabel="z", viewmode=:fitzoom, aspect=:data)
 
-axbbar = Axis(fig[4, 1], title="<b>", xlabel="<b>", ylabel="z")
-axparticle = Axis(fig[4, 2], title="Particle location", xlabel="x", ylabel="z")
-axage = Axis(fig[4, 3], title="Particle age", xlabel="Age (days)", ylabel="z")
+# axbbar = Axis(fig[4, 1], title="<b>", xlabel="<b>", ylabel="z")
+# axparticle = Axis(fig[4, 2], title="Particle location", xlabel="x", ylabel="z")
+# axage = Axis(fig[4, 3], title="Particle age", xlabel="Age (days)", ylabel="z")
 
-xs_xy = xC
-ys_xy = yC
-zs_xy = [zC[Nz] for x in xs_xy, y in ys_xy]
+# xs_xy = xC
+# ys_xy = yC
+# zs_xy = [zC[Nz] for x in xs_xy, y in ys_xy]
 
-ys_yz = yC
-xs_yz = range(xC[1], stop=xC[1], length=length(zC))
-zs_yz = zeros(length(xs_yz), length(ys_yz))
-for j in axes(zs_yz, 2)
-  zs_yz[:, j] .= zC
-end
+# ys_yz = yC
+# xs_yz = range(xC[1], stop=xC[1], length=length(zC))
+# zs_yz = zeros(length(xs_yz), length(ys_yz))
+# for j in axes(zs_yz, 2)
+#   zs_yz[:, j] .= zC
+# end
 
-xs_xz = xC
-ys_xz = range(yC[1], stop=yC[1], length=length(zC))
-zs_xz = zeros(length(xs_xz), length(ys_xz))
-for i in axes(zs_xz, 1)
-  zs_xz[i, :] .= zC
-end
+# xs_xz = xC
+# ys_xz = range(yC[1], stop=yC[1], length=length(zC))
+# zs_xz = zeros(length(xs_xz), length(ys_xz))
+# for i in axes(zs_xz, 1)
+#   zs_xz[i, :] .= zC
+# end
 
-colormap = Reverse(:RdBu_10)
-b_color_range = blim
+# colormap = Reverse(:RdBu_10)
+# b_color_range = blim
 
-n = Observable(1)
+# n = Observable(1)
 
-parameters = jldopen("$(FILE_DIR)/instantaneous_timeseries.jld2", "r") do file
-    return Dict([(key, file["metadata/parameters/$(key)"]) for key in keys(file["metadata/parameters"])])
-end 
+# parameters = jldopen("$(FILE_DIR)/instantaneous_timeseries.jld2", "r") do file
+#     return Dict([(key, file["metadata/parameters/$(key)"]) for key in keys(file["metadata/parameters"])])
+# end 
 
-time_str = @lift "Qᵁ = $(Qᵁ), Qᴮ = $(Qᴮ), Time = $(round(bbar_data.times[$n]/24/60^2, digits=3)) days"
-title = Label(fig[0, :], time_str, font=:bold, tellwidth=false)
+# time_str = @lift "Qᵁ = $(Qᵁ), Qᴮ = $(Qᴮ), Time = $(round(bbar_data.times[$n]/24/60^2, digits=3)) days"
+# title = Label(fig[0, :], time_str, font=:bold, tellwidth=false)
 
-bₙ_xy = @lift interior(b_xy_data[$n], :, :, 1)
-bₙ_yz = @lift transpose(interior(b_yz_data[$n], 1, :, :))
-bₙ_xz = @lift interior(b_xz_data[$n], :, 1, :)
+# bₙ_xy = @lift interior(b_xy_data[$n], :, :, 1)
+# bₙ_yz = @lift transpose(interior(b_yz_data[$n], 1, :, :))
+# bₙ_xz = @lift interior(b_xz_data[$n], :, 1, :)
 
-bbarₙ = @lift interior(bbar_data[$n], 1, 1, :)
-xs_particleₙ = @lift particle_data[$n].x
-zs_particleₙ = @lift particle_data[$n].z
-ages_particleₙ = @lift particle_data[$n].age ./ (24 * 60^2)
-# markersizesₙ = @lift 9 * particle_data[$n].radius ./ 0.0015
-markersizesₙ = @lift ifelse($n == 1, 9 .* ones(n_particles), 9 * particle_data[$n].radius .* (particle_data[$n].age .!= 0) ./ mean(particle_data[$n].radius[particle_data[$n].age .!= 0]))
+# bbarₙ = @lift interior(bbar_data[$n], 1, 1, :)
+# xs_particleₙ = @lift particle_data[$n].x
+# zs_particleₙ = @lift particle_data[$n].z
+# ages_particleₙ = @lift particle_data[$n].age ./ (24 * 60^2)
+# # markersizesₙ = @lift 9 * particle_data[$n].radius ./ 0.0015
+# markersizesₙ = @lift ifelse($n == 1, 9 .* ones(n_particles), 9 * particle_data[$n].radius .* (particle_data[$n].age .!= 0) ./ mean(particle_data[$n].radius[particle_data[$n].age .!= 0]))
 
-b_xy_surface = surface!(axb, xs_xy, ys_xy, zs_xy, color=bₙ_xy, colormap=colormap, colorrange = b_color_range)
-b_yz_surface = surface!(axb, xs_yz, ys_yz, zs_yz, color=bₙ_yz, colormap=colormap, colorrange = b_color_range)
-b_xz_surface = surface!(axb, xs_xz, ys_xz, zs_xz, color=bₙ_xz, colormap=colormap, colorrange = b_color_range)
+# b_xy_surface = surface!(axb, xs_xy, ys_xy, zs_xy, color=bₙ_xy, colormap=colormap, colorrange = b_color_range)
+# b_yz_surface = surface!(axb, xs_yz, ys_yz, zs_yz, color=bₙ_yz, colormap=colormap, colorrange = b_color_range)
+# b_xz_surface = surface!(axb, xs_xz, ys_xz, zs_xz, color=bₙ_xz, colormap=colormap, colorrange = b_color_range)
 
-lines!(axbbar, bbarₙ, zC)
-scatter!(axparticle, xs_particleₙ, zs_particleₙ, markersize=markersizesₙ)
-scatter!(axage, ages_particleₙ, zs_particleₙ, markersize=markersizesₙ)
+# lines!(axbbar, bbarₙ, zC)
+# scatter!(axparticle, xs_particleₙ, zs_particleₙ, markersize=markersizesₙ)
+# scatter!(axage, ages_particleₙ, zs_particleₙ, markersize=markersizesₙ)
 
-xlims!(axbbar, bbarlim)
-xlims!(axparticle, (0, Lx))
-# xlims!(axage, (0, 2days))
+# xlims!(axbbar, bbarlim)
+# xlims!(axparticle, (0, Lx))
+# # xlims!(axage, (0, 2days))
 
-ylims!(axparticle, (-Lz, 0))
-ylims!(axage, (-Lz, 0))
+# ylims!(axparticle, (-Lz, 0))
+# ylims!(axage, (-Lz, 0))
 
-CairoMakie.trim!(fig.layout)
-display(fig)
+# CairoMakie.trim!(fig.layout)
+# display(fig)
 
-CairoMakie.record(fig, "./LES/$(FILE_NAME).mp4", 1:Nt, framerate=15) do nn
-    n[] = nn
-    xlims!(axage, (nothing, nothing))
-end
+# CairoMakie.record(fig, "./LES/$(FILE_NAME).mp4", 1:Nt, framerate=15) do nn
+#     n[] = nn
+#     xlims!(axage, (nothing, nothing))
+# end
 
-@info "Animation completed"
+# @info "Animation completed"
 
 particles_data = jldopen("$(FILE_DIR)/particles.jld2", "r")
 
@@ -587,7 +587,7 @@ end
 binned_ages_data = get_age_bin.(Ref(bins), particles_timeseries)
 
 #%%
-fig = Figure(size=(2200, 1000))
+fig = Figure(size=(1920, 1080))
 
 axbbar = Axis(fig[1, 1], title="<b>", xlabel="<b>", ylabel="z")
 axparticle = Axis(fig[1, 2], title="Particle location", xlabel="x", ylabel="z")
@@ -604,7 +604,7 @@ xs_particleₙ = @lift particles_timeseries[$n].x
 zs_particleₙ = @lift particles_timeseries[$n].z
 ages_particleₙ = @lift particles_timeseries[$n].age ./ (24 * 60^2)
 # markersizesₙ = @lift 9 * particle_data[$n].radius ./ 0.0015
-markersizesₙ = @lift ifelse($n == 1, 3 .* ones(n_particles), 3 * particles_timeseries[$n].radius .* (particles_timeseries[$n].age .!= 0) ./ mean(particles_timeseries[$n].radius[particles_timeseries[$n].age .!= 0]))
+markersizesₙ = @lift ifelse($n == 1, 1 .* ones(n_particles), 50 * particles_timeseries[$n].radius .* (particles_timeseries[$n].age .!= 0) ./ maximum(particles_timeseries[$n].radius[particles_timeseries[$n].age .!= 0]))
 
 # depth_categoriesₙ = @lift (1:9)[binned_ages_data[$n].empty][1:end-1]
 # age_categoriesₙ = @lift (binned_ages_data[$n].age_radius³)[binned_ages_data[$n].empty][1:end-1]
@@ -625,7 +625,7 @@ ylims!(axage, (-Lz, 0))
 
 display(fig)
 
-CairoMakie.record(fig, "$(FILE_DIR)/$(FILE_NAME)_distribution_nonorm.mp4", 2:Nt, framerate=15) do nn
+CairoMakie.record(fig, "$(FILE_DIR)/$(FILE_NAME)_distribution_nonorm.mp4", 2:Nt, framerate=30) do nn
     n[] = nn
     category_index = (binned_ages_data[nn].empty)[2:end-1]
     depth_categories = (1:length(bins))[2:end-1][category_index]
