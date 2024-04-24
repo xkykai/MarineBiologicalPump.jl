@@ -281,7 +281,7 @@ particle_velocities = ParticleVelocities(u=particle_forcing_u, v=particle_forcin
     p = @index(Global)
     @inbounds begin
         particles.age[p] = ifelse(clock.time >= particles.release_time[p], particles.age[p] + Δt, particles.age[p])
-        particles.radius[p] = ifelse(particles.age[p] > 0, particles.radius[p] * (1 -  Δt/(3*particles.age[p])), particles.radius[p])
+        particles.radius[p] = ifelse(clock.time >= particles.release_time[p], particles.radius[p] * (1 -  Δt/(3*particles.age[p])), particles.radius[p])
         particles.w_sinking[p] = calculate_w_sinking(particles.radius[p])
     end
 end
